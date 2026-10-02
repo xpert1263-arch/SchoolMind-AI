@@ -1,0 +1,205 @@
+import type { DueStatus, Locale, Weekday } from '@/data/types';
+
+/* Dates are handled as local-calendar ISO strings ("YYYY-MM-DD") so the
+   demo never drifts a day because of UTC conversion, and so the dataset
+   can be expressed relative to "today" instead of a frozen 2024 date. */
+
+export function toISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function fromISODate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
+export function today(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+export function todayISO(): string {
+  return toISODate(today());
+}
+
+export function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+/** ISO date `days` away from today — the backbone of the relative dataset. */
+export function isoFromToday(days: number): string {
+  return toISODate(addDays(today(), days));
+}
+
+export function daysBetween(fromISO: string, toISOStr: string): number {
+  const a = fromISODate(fromISO).getTime();
+  const b = fromISODate(toISOStr).getTime();
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Days from today until `iso`. Negative once the date has passed. */
+export function daysFromToday(iso: string): number {
+  return daysBetween(todayISO(), iso);
+}
+
+/** ISO weekday: 1 = Monday … 7 = Sunday. */
+export function weekdayOf(date: Date): Weekday {
+  const js = date.getDay();
+  return (js === 0 ? 7 : js) as Weekday;
+}
+
+export function weekdayOfISO(iso: string): Weekday {
+  return weekdayOf(fromISODate(iso));
+}
+
+/** Monday of the week containing `date`. */
+export function startOfWeek(date: Date): Date {
+  return addDays(date, -(weekdayOf(date) - 1));
+}
+
+/** The dates of the current Mon–Sat teaching week, as ISO strings. */
+export function currentTeachingWeek(): string[] {
+  const monday = startOfWeek(today());
+  return Array.from({ length: 6 }, (_, i) => toISODate(addDays(monday, i)));
+}
+
+/** Next date that is a teaching day (Mon–Sat), today included. */
+export function nextTeachingDayISO(fromIso = todayISO()): string {
+  let cursor = fromISODate(fromIso);
+  for (let i = 0; i < 7; i += 1) {
+    if (weekdayOf(cursor) !== 7) return toISODate(cursor);
+    cursor = addDays(cursor, 1);
+  }
+  return fromIso;
+}
+
+export function isToday(iso: string): boolean {
+  return iso === todayISO();
+}
+
+/* Browser Intl data for `uz-UZ` is unusable ("M10 2, Fri"), so Uzbek
+   dates are formatted from our own tables. Russian uses Intl, which is
+   correct and handles the genitive month forms for us. */
+
+const UZ_MONTHS_LONG = [
+  'yanvar',
+  'fevral',
+  'mart',
+  'aprel',
+  'may',
+  'iyun',
+  'iyul',
+  'avgust',
+  'sentabr',
+  'oktabr',
+  'noyabr',
+  'dekabr',
+];
+
+const UZ_MONTHS_SHORT = [
+  'yan',
+  'fev',
+  'mar',
+  'apr',
+  'may',
+  'iyn',
+  'iyl',
+  'avg',
+  'sen',
+  'okt',
+  'noy',
+  'dek',
+];
+
+/** Indexed by ISO weekday - 1 (Monday first). */
+const UZ_WEEKDAYS_LONG = [
+  'dushanba',
+  'seshanba',
+  'chorshanba',
+  'payshanba',
+  'juma',
+  'shanba',
+  'yakshanba',
+];
+
+const UZ_WEEKDAYS_SHORT = ['Du', 'Se', 'Cho', 'Pay', 'Ju', 'Sha', 'Yak'];
+
+function formatUzbek(date: Date, options: Intl.DateTimeFormatOptions): string {
+  const monthIndex = date.getMonth();
+  const month =
+    options.month === 'long'
+      ? UZ_MONTHS_LONG[monthIndex]
+      : options.month === 'short'
+        ? UZ_MONTHS_SHORT[monthIndex]
+        : '';
+
+  let datePart = '';
+  if (options.day && month) datePart = `${date.getDate()}-${month}`;
+  else if (options.day) datePart = String(date.getDate());
+  else if (month) datePart = month;
+
+  const iso = weekdayOf(date);
+  const weekday =
+    options.weekday === 'long'
+      ? UZ_WEEKDAYS_LONG[iso - 1]
+      : options.weekday === 'short'
+        ? UZ_WEEKDAYS_SHORT[iso - 1]
+        : '';
+
+  if (datePart && weekday) return `${datePart}, ${weekday}`;
+  return datePart || weekday;
+}
+
+export function formatDate(
+  iso: string,
+  locale: Locale,
+  options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' },
+): string {
+  const date = fromISODate(iso);
+  if (locale === 'uz') return formatUzbek(date, options);
+  return new Intl.DateTimeFormat('ru-RU', options).format(date);
+}
+
+/** 24-hour clock, identical in both languages. */
+export function formatTime(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return `${`${date.getHours()}`.padStart(2, '0')}:${`${date.getMinutes()}`.padStart(2, '0')}`;
+}
+
+export function formatLongDate(iso: string, locale: Locale): string {
+  return formatDate(iso, locale, { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/** "08:30" → minutes since midnight, for sorting and "now" comparisons. */
+export function minutesOf(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function nowMinutes(): number {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+export type DayPart = 'morning' | 'afternoon' | 'evening';
+
+export function dayPart(): DayPart {
+  const h = new Date().getHours();
+  if (h < 12) return 'morning';
+  if (h < 18) return 'afternoon';
+  return 'evening';
+}
+
+export function dueStatusOf(dueISO: string, completed: boolean): DueStatus {
+  if (completed) return 'completed';
+  const delta = daysFromToday(dueISO);
+  if (delta < 0) return 'overdue';
+  if (delta === 0) return 'today';
+  if (delta <= 2) return 'soon';
+  return 'upcoming';
+}

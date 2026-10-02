@@ -1,0 +1,148 @@
+/* ------------------------------------------------------------------
+   SchoolMind design tokens
+   Colour values are stored as raw "R G B" channels so Tailwind can
+   apply alpha (`bg-accent/10`). Two themes, two workspace accents.
+   ------------------------------------------------------------------ */
+
+:root {
+  /* surfaces — light theme is layered, not flat white */
+  --c-canvas: 249 250 251;
+  --c-surface: 255 255 255;
+  --c-surface-muted: 244 245 247;
+  --c-surface-sunken: 237 239 243;
+  --c-surface-raised: 255 255 255;
+
+  --c-line: 227 230 235;
+  --c-line-strong: 209 214 221;
+
+  --c-text: 16 19 25;
+  --c-text-muted: 92 100 114;
+  --c-text-subtle: 134 142 156;
+
+  /* semantic */
+  --c-success: 21 148 73;
+  --c-success-soft: 237 250 241;
+  --c-success-text: 20 118 60;
+  --c-success-line: 199 235 212;
+
+  --c-warn: 200 110 10;
+  --c-warn-soft: 254 248 235;
+  --c-warn-text: 165 88 6;
+  --c-warn-line: 245 225 185;
+
+  --c-danger: 212 42 42;
+  --c-danger-soft: 254 242 242;
+  --c-danger-text: 177 32 32;
+  --c-danger-line: 247 211 211;
+
+  --c-info: 10 123 196;
+  --c-info-soft: 238 247 254;
+  --c-info-text: 10 101 163;
+  --c-info-line: 198 225 244;
+
+  --shadow-subtle: 0 1px 2px rgb(16 19 25 / 0.04), 0 1px 1px rgb(16 19 25 / 0.03);
+  --shadow-raised: 0 1px 2px rgb(16 19 25 / 0.05), 0 6px 16px -6px rgb(16 19 25 / 0.1);
+  --shadow-overlay: 0 1px 2px rgb(16 19 25 / 0.06), 0 18px 48px -12px rgb(16 19 25 / 0.22);
+
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+}
+
+.dark {
+  --c-canvas: 9 10 12;
+  --c-surface: 18 20 24;
+  --c-surface-muted: 25 28 33;
+  --c-surface-sunken: 13 15 18;
+  --c-surface-raised: 23 26 31;
+
+  --c-line: 38 42 49;
+  --c-line-strong: 55 61 71;
+
+  --c-text: 236 238 243;
+  --c-text-muted: 152 161 175;
+  --c-text-subtle: 113 122 137;
+
+  --c-success: 45 190 100;
+  --c-success-soft: 15 38 24;
+  --c-success-text: 90 219 139;
+  --c-success-line: 29 66 42;
+
+  --c-warn: 230 155 30;
+  --c-warn-soft: 45 33 12;
+  --c-warn-text: 247 190 80;
+  --c-warn-line: 73 54 20;
+
+  --c-danger: 235 90 90;
+  --c-danger-soft: 50 21 21;
+  --c-danger-text: 248 128 128;
+  --c-danger-line: 82 36 36;
+
+  --c-info: 60 165 230;
+  --c-info-soft: 12 32 48;
+  --c-info-text: 118 198 247;
+  --c-info-line: 25 56 80;
+
+  --shadow-subtle: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 20px -8px rgb(0 0 0 / 0.5);
+  --shadow-overlay: 0 1px 2px rgb(0 0 0 / 0.5), 0 24px 56px -12px rgb(0 0 0 / 0.7);
+}
+
+/* ---- workspace accents -------------------------------------------
+   The design system stays identical across modes; only the accent
+   family shifts so the two workspaces feel distinct inside one OS. */
+
+:root,
+[data-mode='student'] {
+  --c-accent: 13 148 136;
+  --c-accent-hover: 15 118 110;
+  --c-accent-contrast: 255 255 255;
+  --c-accent-soft: 237 250 248;
+  --c-accent-text: 14 116 107;
+  --c-accent-line: 198 232 227;
+}
+
+[data-mode='teacher'] {
+  --c-accent: 79 70 229;
+  --c-accent-hover: 67 56 202;
+  --c-accent-contrast: 255 255 255;
+  --c-accent-soft: 240 241 254;
+  --c-accent-text: 73 62 213;
+  --c-accent-line: 214 215 250;
+}
+
+.dark,
+.dark[data-mode='student'] {
+  --c-accent: 20 178 160;
+  --c-accent-hover: 32 196 177;
+  --c-accent-contrast: 4 24 22;
+  --c-accent-soft: 14 42 39;
+  --c-accent-text: 64 212 194;
+  --c-accent-line: 24 66 61;
+}
+
+.dark[data-mode='teacher'] {
+  --c-accent: 110 108 240;
+  --c-accent-hover: 128 126 246;
+  --c-accent-contrast: 255 255 255;
+  --c-accent-soft: 28 29 60;
+  --c-accent-text: 162 160 250;
+  --c-accent-line: 48 48 92;
+}
+
+/* ---- subject colour system ---------------------------------------
+   Every subject carries a hue; chips derive their palette from it so
+   we never hardcode seven bespoke colour sets. */
+
+[data-hue] {
+  --subject-fg: hsl(var(--hue) 62% 30%);
+  --subject-bg: hsl(var(--hue) 70% 96%);
+  --subject-line: hsl(var(--hue) 50% 87%);
+  --subject-dot: hsl(var(--hue) 60% 45%);
+}
+
+.dark [data-hue] {
+  --subject-fg: hsl(var(--hue) 68% 74%);
+  --subject-bg: hsl(var(--hue) 40% 14%);
+  --subject-line: hsl(var(--hue) 32% 26%);
+  --subject-dot: hsl(var(--hue) 62% 58%);
+}
