@@ -88,6 +88,14 @@ export function decorate(lesson: Lesson): ScheduledLesson {
 const bySlot = (a: ScheduledLesson, b: ScheduledLesson) =>
   minutesOf(a.slot.start) - minutesOf(b.slot.start);
 
+const lessonIndex = new Map(lessons.map((l) => [l.id, l]));
+
+/** Decorated lesson by id — used when an answer references one. */
+export function scheduledLessonById(id: ID): ScheduledLesson | undefined {
+  const lesson = lessonIndex.get(id);
+  return lesson ? decorate(lesson) : undefined;
+}
+
 export function lessonsOfClass(classId: ID, weekday: Weekday): ScheduledLesson[] {
   return lessons
     .filter((l) => l.classId === classId && l.weekday === weekday)

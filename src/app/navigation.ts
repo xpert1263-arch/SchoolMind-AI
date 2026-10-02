@@ -46,7 +46,7 @@ export const studentNav: NavGroup[] = [
   {
     labelKey: 'nav.groupAi',
     items: [
-      { to: '/student/ask', labelKey: 'nav.askSchool', icon: MessagesSquare, futureVersion: 'v1.1' },
+      { to: '/student/ask', labelKey: 'nav.askSchool', icon: MessagesSquare },
       { to: '/student/tutor', labelKey: 'nav.aiTutor', icon: Sparkles, futureVersion: 'v1.4' },
     ],
   },

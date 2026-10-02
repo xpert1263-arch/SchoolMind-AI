@@ -1,6 +1,6 @@
 # SchoolMind — AI School Assistant
 
-**v1.0 — Foundation**
+**v1.1 — AskMySchool intelligence**
 
 SchoolMind is one school operating system with **two workspaces** — Student and
 Teacher — built on **one shared school data model**. Switching mode changes the
@@ -23,13 +23,24 @@ Then open the printed URL (default <http://localhost:5180>).
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Vite dev server |
+| `npm run dev` | Vite dev server (also serves the AskMySchool API) |
 | `npm run build` | Typecheck (`tsc -b`) then production build |
 | `npm run preview` | Serve the production build |
 | `npm run typecheck` | Types only |
 
-No backend, no accounts, no API keys. The whole demo session lives in one
-versioned `localStorage` key (`schoolmind.v1`).
+No accounts. The demo session lives in one versioned `localStorage` key
+(`schoolmind.v1`). AskMySchool adds a small server-side API for AI; see below.
+
+### AI setup (optional)
+
+```bash
+cp .env.example .env     # then paste a Gemini key into GEMINI_API_KEY
+```
+
+Without a key the app runs fine: every schedule, homework, test and
+announcement question is answered from SchoolMind's own data with no
+network at all. Only AI explanations and live web search are disabled,
+and the UI says so instead of pretending.
 
 ---
 
@@ -61,12 +72,20 @@ src/
   data/         types, demo dataset, pure lookups/queries
   features/
     student/    Home, My Day, Schedule, Homework
+      ask/      AskMySchool page and answer-block renderers
     teacher/    Overview, Classes, Assignments, Students
     shared/     planned-capability pages, 404
   i18n/         uz (source of truth), ru (typed against uz), translator
   lib/          dates, labels, class-name helper, AI extension point
+    ask/        router, school engine, context builder, API client, hook
   state/        reducer store, persistence, derived selectors, toasts
   styles/       design tokens + Tailwind layers
+
+server/         Node only — never imported by src/
+  env.mjs       reads GEMINI_API_KEY; the one place a secret exists
+  gemini.mjs    Gemini provider, with and without grounded search
+  askHandler.mjs  POST /api/ask, GET /api/ask/status
+  vitePlugin.mjs  mounts the API in dev and preview
 ```
 
 ### One data model, two views
@@ -114,15 +133,70 @@ key. No external state library.
 
 ---
 
-## Not in v1.0
+## AskMySchool (v1.1)
 
-`Ask School`, `AI Tutor`, `ClassPulse` and `Teacher AI` are reachable and
+`/student/ask` is a universal question interface, not a chatbot. Every
+question is routed before it is answered:
+
+```
+question -> router -> SCHOOL_DATA | AI_KNOWLEDGE | WEB_SEARCH | HYBRID
+                   -> structured blocks + honest source badges
+```
+
+The router is deterministic and built on two independent signals — is a
+SchoolMind *record* being asked about, and does the answer depend on
+*current external* information. A subject name alone is only a weak
+signal, which is what keeps "explain algebra" (knowledge) apart from
+"algebra homework" (records). Only when neither signal fires does the
+server spend one small model call deciding whether the question needs
+fresh information.
+
+**School facts never come from the model.** `src/lib/ask/schoolEngine.ts`
+resolves them from the shared dataset over (topic x day x subject x
+ordinal), so wording can vary freely. Those answers need no network, so
+they work with no API key configured.
+
+Follow-ups carry a small focus object (subject, date, lesson,
+assignment), so "Qaysi xonada?" and "Qachongacha?" resolve against the
+previous answer instead of starting over.
+
+### Where the key lives
+
+The browser never sees it. `server/env.mjs` reads `GEMINI_API_KEY` in the
+Node process; `server/vitePlugin.mjs` mounts `/api/ask` into Vite's dev
+*and* preview servers. Nothing under `src/` imports anything under
+`server/`, and the SDK is absent from the client bundle.
+
+### Live web search
+
+Grounded Google Search uses the official `@google/genai` SDK —
+`tools: [{ googleSearch: {} }]` — and citations are read back out of the
+provider's own `groundingMetadata`. There is no hand-written list of
+websites and no fabricated URL anywhere: if the provider returns no
+grounding evidence, the answer says so and the Web badge is withheld.
+
+Search is not split into a separate `webSearchProvider` module, because
+this provider grounds and generates in one call; splitting it would mean
+inventing a seam the API does not have. The boundary that matters —
+"generate with search" vs "generate without" — is one flag on
+`server/gemini.mjs`.
+
+### Honesty rules
+
+- `SchoolMind` badge only when school records were used.
+- `Web` badge only when search actually returned grounding evidence.
+- Search failure degrades to a plain AI answer **and says so**.
+- Missing records are reported as missing, never filled in.
+
+## Not in v1.1
+
+`AI Tutor`, `ClassPulse` and `Teacher AI` are reachable and
 honestly labelled with their target version. They describe what they will do and
 **never fake a model response**. `src/lib/ai/provider.ts` fixes the shape of the
 future integration boundary and ships a provider that advertises no
 capabilities — no model calls, no credentials.
 
-Roadmap: v1.1 AskMySchool · v1.2 SnapHomework · v1.3 AI Planner · v1.4 AI Tutor ·
+Roadmap: v1.2 SnapHomework · v1.3 AI Planner · v1.4 AI Tutor ·
 v1.5 Quiz / Learning Loop · v1.6 Teacher expansion · v1.7 ClassPulse ·
 v1.8 School Intelligence.
 

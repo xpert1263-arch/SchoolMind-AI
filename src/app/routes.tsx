@@ -1,5 +1,5 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
-import { LineChart, MessagesSquare, Sparkles } from 'lucide-react';
+import { LineChart, Sparkles } from 'lucide-react';
 import { AppShell } from './AppShell';
 import { readStoredState } from '@/state/storage';
 import type { AppMode } from '@/data/types';
@@ -8,6 +8,7 @@ import { StudentHome } from '@/features/student/StudentHome';
 import { MyDay } from '@/features/student/MyDay';
 import { Schedule } from '@/features/student/Schedule';
 import { Homework } from '@/features/student/Homework';
+import { AskSchool } from '@/features/student/ask/AskSchool';
 import { TeacherOverview } from '@/features/teacher/TeacherOverview';
 import { Classes } from '@/features/teacher/Classes';
 import { Assignments } from '@/features/teacher/Assignments';
@@ -33,20 +34,7 @@ export const router = createBrowserRouter([
       { path: 'student/day', element: <MyDay /> },
       { path: 'student/schedule', element: <Schedule /> },
       { path: 'student/homework', element: <Homework /> },
-      {
-        path: 'student/ask',
-        element: (
-          <FuturePage
-            titleKey="future.askSchoolTitle"
-            bodyKey="future.askSchoolBody"
-            version="v1.1"
-            icon={<MessagesSquare size={22} aria-hidden />}
-            backTo="/student/home"
-            backLabelKey="nav.home"
-            pointKeys={['future.askSchoolP1', 'future.askSchoolP2', 'future.askSchoolP3']}
-          />
-        ),
-      },
+      { path: 'student/ask', element: <AskSchool /> },
       {
         path: 'student/tutor',
         element: (

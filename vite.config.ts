@@ -1,9 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
+// Server-side only: keeps the Gemini key out of the client bundle.
+import { askMySchoolApi } from './server/vitePlugin.mjs';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), askMySchoolApi()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
