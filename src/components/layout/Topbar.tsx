@@ -43,7 +43,7 @@ export function Topbar({
       </Button>
 
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="lg:hidden">
+        <span className="hidden sm:inline lg:hidden">
           <LogoMark size={24} />
         </span>
         <div className="hidden min-w-0 items-center gap-2 text-[13px] lg:flex">
@@ -60,15 +60,21 @@ export function Topbar({
       </div>
 
       <div className="mx-auto">
-        <ModeSwitch mode={mode} onChange={onChangeMode} compact />
+        <ModeSwitch mode={mode} onChange={onChangeMode} />
       </div>
 
+      {/* Phones carry only the mode switch and notifications here;
+          language, theme and the profile live in the slide-over menu,
+          so the bar stays legible at 375px. */}
       <div className="flex shrink-0 items-center gap-1">
-        <LocaleToggle locale={locale} onChange={setLocale} />
+        <span className="hidden sm:flex">
+          <LocaleToggle locale={locale} onChange={setLocale} />
+        </span>
 
         <Button
           variant="ghost"
           size="icon"
+          className="hidden sm:inline-flex"
           onClick={toggleTheme}
           aria-label={t('a11y.toggleTheme')}
           title={isDark ? t('settings.light') : t('settings.dark')}
@@ -78,22 +84,24 @@ export function Topbar({
 
         <NotificationsButton />
 
-        <Popover
-          label={t('a11y.profile')}
-          widthClass="w-60"
-          trigger={({ toggle }) => (
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label={t('a11y.profile')}
-              className="ml-0.5 rounded-full transition-opacity hover:opacity-85"
-            >
-              <ProfileAvatar mode={mode} />
-            </button>
-          )}
-        >
-          {() => <ProfileCard mode={mode} />}
-        </Popover>
+        <span className="hidden sm:block">
+          <Popover
+            label={t('a11y.profile')}
+            widthClass="w-60"
+            trigger={({ toggle }) => (
+              <button
+                type="button"
+                onClick={toggle}
+                aria-label={t('a11y.profile')}
+                className="ml-0.5 rounded-full transition-opacity hover:opacity-85"
+              >
+                <ProfileAvatar mode={mode} />
+              </button>
+            )}
+          >
+            {() => <ProfileCard mode={mode} />}
+          </Popover>
+        </span>
       </div>
     </header>
   );

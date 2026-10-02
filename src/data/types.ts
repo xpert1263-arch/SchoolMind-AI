@@ -67,6 +67,14 @@ export interface Student {
   classId: ID;
 }
 
+/** Who teaches which subject to which classes. The relation the whole
+ *  teacher side of the model hangs off. */
+export interface TeachingAssignment {
+  teacherId: ID;
+  subjectId: ID;
+  classIds: ID[];
+}
+
 export interface Lesson {
   id: ID;
   classId: ID;

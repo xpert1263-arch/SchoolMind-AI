@@ -4,12 +4,14 @@ import type {
   ID,
   Lesson,
   LessonSlot,
+  LocalizedText,
   PersonalTask,
   School,
   SchoolClass,
   Student,
   Subject,
   Teacher,
+  TeachingAssignment,
   Weekday,
 } from './types';
 import { isoFromToday } from '@/lib/dates';
@@ -56,75 +58,104 @@ const subjectRooms: Record<ID, string> = {
   it: '9',
 };
 
-export const teachers: Teacher[] = [
+/**
+ * Who teaches what, to whom. This is the single source of truth for the
+ * teacher/subject/class relation: the teacher roster, the timetable and
+ * the assignment form all derive from it, so a teacher is never offered
+ * a subject they do not actually teach to the selected class.
+ *
+ * Nilufar carries mathematics across all three classes and physics for
+ * 10-A — a normal pairing, and the reason subject choice is a real
+ * decision in the assignment form rather than a single fixed value.
+ */
+export const teachingAssignments: TeachingAssignment[] = [
+  { teacherId: 't1', subjectId: 'math', classIds: ['9a', '9b', '10a'] },
+  { teacherId: 't1', subjectId: 'physics', classIds: ['10a'] },
+  { teacherId: 't2', subjectId: 'physics', classIds: ['9a', '9b'] },
+  { teacherId: 't3', subjectId: 'biology', classIds: ['9a', '9b'] },
+  { teacherId: 't4', subjectId: 'english', classIds: ['9a', '9b', '10a'] },
+  { teacherId: 't5', subjectId: 'history', classIds: ['9a', '10a'] },
+  { teacherId: 't6', subjectId: 'native', classIds: ['9a', '9b'] },
+  { teacherId: 't7', subjectId: 'it', classIds: ['9a', '10a'] },
+];
+
+interface TeacherSeed {
+  id: ID;
+  firstName: string;
+  lastName: string;
+  title: LocalizedText;
+}
+
+const teacherSeeds: TeacherSeed[] = [
   {
     id: 't1',
     firstName: 'Nilufar',
     lastName: 'Rashidova',
-    subjectIds: ['math'],
-    classIds: ['9a', '9b', '10a'],
-    title: { uz: 'Matematika oʻqituvchisi', ru: 'Учитель математики' },
+    title: { uz: 'Matematika va fizika oʻqituvchisi', ru: 'Учитель математики и физики' },
   },
   {
     id: 't2',
     firstName: 'Bekzod',
     lastName: 'Tursunov',
-    subjectIds: ['physics'],
-    classIds: ['9a', '9b', '10a'],
     title: { uz: 'Fizika oʻqituvchisi', ru: 'Учитель физики' },
   },
   {
     id: 't3',
     firstName: 'Dilnoza',
     lastName: 'Yusupova',
-    subjectIds: ['biology'],
-    classIds: ['9a', '9b'],
     title: { uz: 'Biologiya oʻqituvchisi', ru: 'Учитель биологии' },
   },
   {
     id: 't4',
     firstName: 'Kamola',
     lastName: 'Saidova',
-    subjectIds: ['english'],
-    classIds: ['9a', '9b', '10a'],
     title: { uz: 'Ingliz tili oʻqituvchisi', ru: 'Учитель английского' },
   },
   {
     id: 't5',
     firstName: 'Jasur',
     lastName: 'Ergashev',
-    subjectIds: ['history'],
-    classIds: ['9a', '10a'],
     title: { uz: 'Tarix oʻqituvchisi', ru: 'Учитель истории' },
   },
   {
     id: 't6',
     firstName: 'Gulnora',
     lastName: 'Ismoilova',
-    subjectIds: ['native'],
-    classIds: ['9a', '9b'],
     title: { uz: 'Ona tili oʻqituvchisi', ru: 'Учитель родного языка' },
   },
   {
     id: 't7',
     firstName: 'Sardor',
     lastName: 'Qodirov',
-    subjectIds: ['it'],
-    classIds: ['9a', '10a'],
     title: { uz: 'Informatika oʻqituvchisi', ru: 'Учитель информатики' },
   },
 ];
 
-/** Subject -> the teacher who delivers it in this school. */
-const subjectTeacher: Record<ID, ID> = {
-  math: 't1',
-  physics: 't2',
-  biology: 't3',
-  english: 't4',
-  history: 't5',
-  native: 't6',
-  it: 't7',
-};
+/** A teacher's subjects and classes are the union of their teaching rows. */
+export const teachers: Teacher[] = teacherSeeds.map((seed) => {
+  const rows = teachingAssignments.filter((row) => row.teacherId === seed.id);
+  return {
+    ...seed,
+    subjectIds: [...new Set(rows.map((row) => row.subjectId))],
+    classIds: [...new Set(rows.flatMap((row) => row.classIds))],
+  };
+});
+
+/** The teacher who delivers `subjectId` to `classId`. */
+export function teacherForSubject(subjectId: ID, classId: ID): ID {
+  const row = teachingAssignments.find(
+    (entry) => entry.subjectId === subjectId && entry.classIds.includes(classId),
+  );
+  if (!row) throw new Error(`No teacher teaches ${subjectId} to ${classId}`);
+  return row.teacherId;
+}
+
+/** Subjects a teacher may set work in for a given class. */
+export function subjectIdsTaughtBy(teacherId: ID, classId: ID): ID[] {
+  return teachingAssignments
+    .filter((row) => row.teacherId === teacherId && row.classIds.includes(classId))
+    .map((row) => row.subjectId);
+}
 
 const roster = (classId: ID, names: string[]): Student[] =>
   names.map((full, i) => {
@@ -216,55 +247,54 @@ export const classes: SchoolClass[] = [
 
 /* ---- weekly timetable --------------------------------------------- */
 
-/** [lesson slot, subject]. Slots are explicit because a subject
- *  teacher cannot stand in two classrooms during the same period —
- *  the generated timetable below is conflict-free by construction. */
-type DayPlan = Array<[number, ID]>;
-type WeekPlan = Partial<Record<Weekday, DayPlan>>;
+/** Subjects in lesson-slot order. Every class day runs from the first
+ *  period with no free gaps, and the arrangement is conflict-free: no
+ *  teacher and no subject room is ever booked twice in one period. */
+type WeekPlan = Partial<Record<Weekday, ID[]>>;
 
 const timetables: Record<ID, WeekPlan> = {
   '9a': {
-    1: [[1, 'math'], [2, 'physics'], [3, 'english'], [4, 'native'], [5, 'history']],
-    2: [[1, 'biology'], [2, 'math'], [3, 'it'], [4, 'english'], [5, 'native']],
-    3: [[1, 'math'], [2, 'history'], [3, 'physics'], [4, 'biology'], [5, 'english'], [6, 'it']],
-    4: [[1, 'native'], [2, 'math'], [3, 'english'], [4, 'physics'], [5, 'biology']],
-    5: [[1, 'math'], [2, 'it'], [3, 'history'], [4, 'native'], [5, 'english']],
-    6: [[1, 'biology'], [2, 'math'], [3, 'physics']],
+    1: ['math', 'physics', 'english', 'native', 'history'],
+    2: ['biology', 'math', 'it', 'english', 'native'],
+    3: ['math', 'history', 'physics', 'biology', 'english', 'it'],
+    4: ['native', 'math', 'english', 'physics', 'biology'],
+    5: ['math', 'it', 'history', 'native', 'english'],
+    6: ['biology', 'physics', 'math'],
   },
   '9b': {
-    1: [[1, 'physics'], [2, 'math'], [3, 'biology'], [4, 'english']],
-    2: [[1, 'math'], [2, 'native'], [3, 'english'], [4, 'biology']],
-    3: [[1, 'english'], [2, 'physics'], [3, 'math'], [4, 'native']],
-    4: [[1, 'math'], [2, 'biology'], [3, 'physics'], [4, 'english']],
-    5: [[1, 'native'], [2, 'math'], [3, 'english'], [4, 'biology']],
-    6: [[1, 'math'], [2, 'physics']],
+    1: ['physics', 'math', 'biology', 'english'],
+    2: ['math', 'native', 'english', 'biology'],
+    3: ['english', 'physics', 'math', 'native'],
+    4: ['math', 'biology', 'physics', 'english'],
+    5: ['native', 'math', 'english', 'biology'],
+    6: ['physics', 'math'],
   },
   '10a': {
-    1: [[1, 'history'], [2, 'it'], [3, 'math'], [5, 'english']],
-    2: [[3, 'math'], [4, 'history'], [5, 'english'], [6, 'physics']],
-    3: [[1, 'it'], [2, 'math'], [4, 'physics'], [6, 'english']],
-    4: [[1, 'english'], [2, 'history'], [3, 'math'], [4, 'it']],
-    5: [[3, 'math'], [4, 'physics'], [5, 'history'], [6, 'english']],
-    6: [[1, 'it'], [3, 'math']],
+    1: ['history', 'english', 'it', 'math'],
+    2: ['english', 'history', 'math', 'physics'],
+    3: ['it', 'math', 'english', 'physics'],
+    4: ['english', 'history', 'math', 'it'],
+    5: ['english', 'history', 'math', 'physics'],
+    6: ['math', 'it'],
   },
 };
 
 function buildLessons(): Lesson[] {
   const out: Lesson[] = [];
   for (const [classId, plan] of Object.entries(timetables)) {
-    for (const [day, entries] of Object.entries(plan)) {
+    for (const [day, subjectIds] of Object.entries(plan)) {
       const weekday = Number(day) as Weekday;
-      for (const [slot, subjectId] of entries) {
+      subjectIds.forEach((subjectId, i) => {
         out.push({
-          id: `${classId}-${weekday}-${slot}`,
+          id: `${classId}-${weekday}-${i + 1}`,
           classId,
           subjectId,
-          teacherId: subjectTeacher[subjectId],
+          teacherId: teacherForSubject(subjectId, classId),
           weekday,
-          slot,
+          slot: i + 1,
           room: subjectRooms[subjectId],
         });
-      }
+      });
     }
   }
   return out;
@@ -481,12 +511,25 @@ const assignmentSeeds: AssignmentSeed[] = [
     dueIn: 3,
     createdAgo: 2,
   },
+  {
+    id: 'd3',
+    kind: 'homework',
+    subjectId: 'physics',
+    classId: '10a',
+    title: { uz: 'Dinamika — 5, 8-masalalar', ru: 'Динамика — задачи 5, 8' },
+    description: {
+      uz: 'Nyuton qonunlariga oid masalalar. Kuchlar sxemasini ham chizing.',
+      ru: 'Задачи на законы Ньютона. Начертите также схему сил.',
+    },
+    dueIn: 1,
+    createdAgo: 1,
+  },
 ];
 
 export const seedAssignments: Assignment[] = assignmentSeeds.map(
   ({ dueIn, createdAgo, ...rest }) => ({
     ...rest,
-    teacherId: subjectTeacher[rest.subjectId],
+    teacherId: teacherForSubject(rest.subjectId, rest.classId),
     dueDate: isoFromToday(dueIn),
     createdAt: isoFromToday(-createdAgo),
     origin: 'seed' as const,

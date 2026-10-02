@@ -29,7 +29,7 @@ export function Segmented<T extends string>({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex w-full items-center gap-0.5 overflow-x-auto rounded-md border border-line bg-surface-muted p-0.5 sm:w-auto',
+        'sm-scroll-hidden inline-flex w-full items-center gap-0.5 overflow-x-auto rounded-md border border-line bg-surface-muted p-0.5 sm:w-auto',
         className,
       )}
     >

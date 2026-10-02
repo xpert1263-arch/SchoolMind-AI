@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, ClipboardList, Plus } from 'lucide-react';
-import type { Assignment, AssignmentKind, ID } from '@/data/types';
+import type { Assignment, AssignmentKind, ID, Subject } from '@/data/types';
 import { classById, subjectById } from '@/data/queries';
-import { subjects } from '@/data/school';
+import { subjectIdsTaughtBy } from '@/data/school';
 import { useI18n } from '@/i18n/useI18n';
 import { formatDate, isoFromToday, todayISO } from '@/lib/dates';
 import { dueLabel } from '@/lib/labels';
@@ -140,12 +140,10 @@ function AssignmentComposer({ open, onClose }: { open: boolean; onClose: () => v
   const { createAssignment } = useApp();
   const toast = useToast();
 
-  const teacherSubjects = subjects.filter((s) => teacher.subjectIds.includes(s.id));
-
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classId, setClassId] = useState<ID>(taughtClasses[0]?.id ?? '');
-  const [subjectId, setSubjectId] = useState<ID>(teacherSubjects[0]?.id ?? subjects[0].id);
+  const [subjectId, setSubjectId] = useState<ID>('');
   const [kind, setKind] = useState<AssignmentKind>('homework');
   const [dueDate, setDueDate] = useState(() => isoFromToday(2));
   const [errors, setErrors] = useState<FormErrors>({});
@@ -156,6 +154,25 @@ function AssignmentComposer({ open, onClose }: { open: boolean; onClose: () => v
   const subjectFieldId = useFieldId('subject');
   const kindId = useFieldId('kind');
   const dueId = useFieldId('due');
+
+  /* A teacher may only set work in subjects they actually teach to the
+     chosen class, so the options come from the shared teaching data and
+     change with the class. */
+  const subjectOptions = useMemo(
+    () => (classId ? subjectIdsTaughtBy(teacher.id, classId).map(subjectById) : []),
+    [teacher.id, classId],
+  );
+
+  /* Keep the selection valid when the class changes. */
+  useEffect(() => {
+    if (subjectOptions.length === 0) {
+      if (subjectId !== '') setSubjectId('');
+      return;
+    }
+    if (!subjectOptions.some((s) => s.id === subjectId)) {
+      setSubjectId(subjectOptions[0].id);
+    }
+  }, [subjectOptions, subjectId]);
 
   const reset = () => {
     setTitle('');
@@ -250,12 +267,7 @@ function AssignmentComposer({ open, onClose }: { open: boolean; onClose: () => v
             htmlFor={subjectFieldId}
             error={errors.subjectId}
           >
-            <SubjectSelect
-              id={subjectFieldId}
-              value={subjectId}
-              onChange={setSubjectId}
-              allowed={teacherSubjects.length > 0 ? teacherSubjects.map((s) => s.id) : undefined}
-            />
+            <SubjectSelect id={subjectFieldId} value={subjectId} onChange={setSubjectId} options={subjectOptions} />
           </Field>
 
           <Field label={t('teacher.assignments.fieldKind')} htmlFor={kindId}>
@@ -313,17 +325,21 @@ function SubjectSelect({
   id,
   value,
   onChange,
-  allowed,
+  options,
 }: {
   id: string;
   value: ID;
   onChange: (value: ID) => void;
-  allowed?: ID[];
+  options: Subject[];
 }) {
   const { text } = useI18n();
-  const options = allowed ? subjects.filter((s) => allowed.includes(s.id)) : subjects;
   return (
-    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={options.length <= 1}
+    >
       {options.map((subject) => (
         <option key={subject.id} value={subject.id}>
           {text(subject.name)}

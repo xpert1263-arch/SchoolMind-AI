@@ -12,11 +12,9 @@ import { cn } from '@/lib/cn';
 export function ModeSwitch({
   mode,
   onChange,
-  compact = false,
 }: {
   mode: AppMode;
   onChange: (mode: AppMode) => void;
-  compact?: boolean;
 }) {
   const { t } = useI18n();
   const modes: AppMode[] = ['student', 'teacher'];
@@ -39,8 +37,7 @@ export function ModeSwitch({
             aria-label={t('a11y.switchMode', { mode: t(`mode.${value}`) })}
             onClick={() => onChange(value)}
             className={cn(
-              'relative flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-150',
-              compact ? 'sm:px-3' : 'px-3 sm:px-3.5',
+              'relative flex items-center gap-1.5 rounded-[7px] px-2.5 py-1.5 text-[13px] font-medium transition-colors duration-150 sm:gap-2 sm:px-3.5',
               active ? 'text-accent-text' : 'text-ink-muted hover:text-ink',
             )}
           >
@@ -52,9 +49,7 @@ export function ModeSwitch({
               />
             ) : null}
             <Icon size={15} aria-hidden className="relative" />
-            <span className={cn('relative', compact && 'hidden sm:inline')}>
-              {t(`mode.${value}`)}
-            </span>
+            <span className="relative">{t(`mode.${value}`)}</span>
           </button>
         );
       })}

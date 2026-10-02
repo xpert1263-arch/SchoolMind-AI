@@ -12,7 +12,9 @@ import { Segmented } from '@/components/ui/Segmented';
 import { HomeworkDetail } from '@/components/school/HomeworkDetail';
 import { HomeworkRow } from '@/components/school/HomeworkRow';
 
-type Filter = 'all' | 'today' | 'upcoming' | 'completed';
+/* The buckets are mutually exclusive and mirror the status shown on each
+   row: an overdue item is overdue, not "today". */
+type Filter = 'all' | 'overdue' | 'today' | 'upcoming' | 'completed';
 
 export function Homework() {
   const { t } = useI18n();
@@ -24,7 +26,8 @@ export function Homework() {
   const buckets = useMemo(
     () => ({
       all: items,
-      today: items.filter((i) => !i.completed && i.daysLeft <= 0),
+      overdue: items.filter((i) => !i.completed && i.daysLeft < 0),
+      today: items.filter((i) => !i.completed && i.daysLeft === 0),
       upcoming: items.filter((i) => !i.completed && i.daysLeft > 0),
       completed: items.filter((i) => i.completed),
     }),
@@ -39,6 +42,11 @@ export function Homework() {
       title: t('student.homework.emptyAll'),
       body: t('student.homework.emptyAllHint'),
       icon: <Inbox size={17} aria-hidden />,
+    },
+    overdue: {
+      title: t('student.homework.emptyOverdue'),
+      body: t('student.homework.emptyOverdueHint'),
+      icon: <CheckCircle2 size={17} aria-hidden />,
     },
     today: {
       title: t('student.homework.emptyToday'),
@@ -68,6 +76,11 @@ export function Homework() {
           onChange={setFilter}
           options={[
             { value: 'all', label: t('student.homework.filterAll'), count: buckets.all.length },
+            {
+              value: 'overdue',
+              label: t('student.homework.filterOverdue'),
+              count: buckets.overdue.length,
+            },
             { value: 'today', label: t('student.homework.filterToday'), count: buckets.today.length },
             {
               value: 'upcoming',

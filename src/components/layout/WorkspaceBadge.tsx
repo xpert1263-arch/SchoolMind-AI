@@ -20,7 +20,14 @@ export function WorkspaceBadge({ mode }: { mode: AppMode }) {
   const caption =
     mode === 'student'
       ? schoolClass.name
-      : teacher.subjectIds.map((id) => text(subjectById(id).name)).join(', ');
+      : /* Several subjects would truncate mid-word in this narrow row,
+           so only the first is named and the rest are counted. */
+        [
+          text(subjectById(teacher.subjectIds[0]).name),
+          teacher.subjectIds.length > 1 ? `+${teacher.subjectIds.length - 1}` : null,
+        ]
+          .filter(Boolean)
+          .join(' ');
 
   return (
     <div className="relative overflow-hidden rounded-lg border border-line bg-surface-muted px-3 py-2.5">
