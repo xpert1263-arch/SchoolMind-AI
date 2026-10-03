@@ -7,6 +7,7 @@ import {
   LineChart,
   MessagesSquare,
   Presentation,
+  ScanLine,
   Sparkles,
   Sun,
   Users,
@@ -47,6 +48,7 @@ export const studentNav: NavGroup[] = [
     labelKey: 'nav.groupAi',
     items: [
       { to: '/student/ask', labelKey: 'nav.askSchool', icon: MessagesSquare },
+      { to: '/student/snap', labelKey: 'nav.snapHomework', icon: ScanLine },
       { to: '/student/tutor', labelKey: 'nav.aiTutor', icon: Sparkles, futureVersion: 'v1.4' },
     ],
   },

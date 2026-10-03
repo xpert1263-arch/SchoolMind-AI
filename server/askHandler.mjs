@@ -1,5 +1,13 @@
 import { describeConfig, hasGeminiKey } from './env.mjs';
-import { AiUnavailableError, generate, needsFreshInformation } from './gemini.mjs';
+import {
+  AiUnavailableError,
+  generate,
+  isGroundingAvailable,
+  isRateLimited,
+  needsFreshInformation,
+} from './gemini.mjs';
+import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
+import { snapRoutes } from './snapHandler.mjs';
 
 /* ------------------------------------------------------------------
    POST /api/ask        answer a question with Gemini, optionally
@@ -20,32 +28,6 @@ const LANGUAGE = {
   uz: 'Uzbek (Latin script)',
   ru: 'Russian',
 };
-
-function send(res, status, payload) {
-  const body = JSON.stringify(payload);
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.end(body);
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks = [];
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > MAX_BODY_BYTES) {
-        reject(new Error('payload_too_large'));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
-}
 
 function buildSystemInstruction(locale, hasSchoolContext) {
   const language = LANGUAGE[locale] ?? LANGUAGE.uz;
@@ -83,9 +65,9 @@ function sanitiseHistory(history) {
 async function handleAsk(req, res) {
   let payload;
   try {
-    payload = JSON.parse((await readBody(req)) || '{}');
+    payload = JSON.parse((await readBody(req, MAX_BODY_BYTES)) || '{}');
   } catch (error) {
-    const tooLarge = error instanceof Error && error.message === 'payload_too_large';
+    const tooLarge = error instanceof PayloadTooLarge;
     send(res, tooLarge ? 413 : 400, {
       ok: false,
       error: tooLarge ? 'payload_too_large' : 'bad_request',
@@ -151,7 +133,12 @@ async function handleAsk(req, res) {
     let result;
     let degraded = null;
 
-    if (wantsWeb) {
+    if (wantsWeb && !isGroundingAvailable()) {
+      /* The account has already refused grounding recently; go straight
+         to a plain answer and label it rather than burning a request. */
+      result = await generate({ system, messages, web: false });
+      degraded = 'web_unavailable';
+    } else if (wantsWeb) {
       try {
         result = await generate({ system, messages, web: true });
         /* Search ran but the provider returned no grounding evidence —
@@ -186,16 +173,13 @@ async function handleAsk(req, res) {
       send(res, 503, { ok: false, error: error.reason });
       return;
     }
+    if (isRateLimited(error)) {
+      send(res, 429, { ok: false, error: 'rate_limited' });
+      return;
+    }
     logFailure('generateContent', error);
     send(res, 502, { ok: false, error: 'upstream_error' });
   }
-}
-
-/** Logs the shape of a failure without ever echoing credentials. */
-function logFailure(label, error) {
-  const message = error instanceof Error ? error.message : String(error);
-  const safe = message.replace(/key=[\w-]+/gi, 'key=***').slice(0, 300);
-  console.error(`[askmyschool] ${label} failed: ${safe}`);
 }
 
 /** Connect-style middleware shared by the dev and preview servers. */
@@ -206,6 +190,8 @@ export function askMiddleware(req, res, next) {
     send(res, 200, { ok: true, ...describeConfig() });
     return;
   }
+
+  if (snapRoutes(req, res, url)) return;
 
   if (url === '/api/ask') {
     if (req.method !== 'POST') {

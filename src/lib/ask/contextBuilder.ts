@@ -1,4 +1,4 @@
-import { announcements as allAnnouncements } from '@/data/school';
+import { announcements as allAnnouncements, school } from '@/data/school';
 import { lessonsOfClass, subjectById } from '@/data/queries';
 import { resolveText, type Assignment, type ID, type Locale, type SchoolClass } from '@/data/types';
 import { addDays, daysFromToday, formatDate, todayISO, toISODate, weekdayOf } from '@/lib/dates';
@@ -34,6 +34,7 @@ export function buildSchoolContext(input: ContextInput): string {
   const subjectId = detectSubjectId(text) ?? focus.subjectId;
 
   const lines: string[] = [
+    `School: ${resolveText(school.name, locale)}, ${resolveText(school.city, locale)}.`,
     `Student: ${studentName}, class ${schoolClass.name} (${schoolClass.studentIds.length} students, room ${schoolClass.room}).`,
     `Today: ${todayISO()} (${formatDate(todayISO(), locale, { weekday: 'long', day: 'numeric', month: 'long' })}).`,
   ];

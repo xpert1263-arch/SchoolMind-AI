@@ -32,6 +32,7 @@ export type AskResponse = AskSuccess | AskFailure;
 
 const KNOWN_ERRORS: AskErrorCode[] = [
   'missing_api_key',
+  'rate_limited',
   'network',
   'upstream_error',
   'empty_response',

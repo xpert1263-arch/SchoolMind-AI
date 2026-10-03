@@ -1,13 +1,13 @@
 # SchoolMind — AI School Assistant
 
-**v1.1 — AskMySchool intelligence**
+**v1.2 — SnapHomework AI Vision**
 
 SchoolMind is one school operating system with **two workspaces** — Student and
 Teacher — built on **one shared school data model**. Switching mode changes the
 navigation, the dashboard and the available tools, but never the identity, the
 design system, the data, the theme, the language or the application state.
 
-Demo school: *41-sonli umumtaʼlim maktabi*, Toshkent.
+Demo school: *Math Academy Private School*, Toshkent.
 Demo student: **Azizbek Karimov, 9-A**. Demo teacher: **Nilufar Rashidova, matematika**.
 
 ---
@@ -73,11 +73,13 @@ src/
   features/
     student/    Home, My Day, Schedule, Homework
       ask/      AskMySchool page and answer-block renderers
+      snap/     SnapHomework workspace and analysis renderers
     teacher/    Overview, Classes, Assignments, Students
     shared/     planned-capability pages, 404
   i18n/         uz (source of truth), ru (typed against uz), translator
   lib/          dates, labels, class-name helper, AI extension point
     ask/        router, school engine, context builder, API client, hook
+    snap/       image intake, maths normaliser, API client, hook
   state/        reducer store, persistence, derived selectors, toasts
   styles/       design tokens + Tailwind layers
 
@@ -85,6 +87,8 @@ server/         Node only — never imported by src/
   env.mjs       reads GEMINI_API_KEY; the one place a secret exists
   gemini.mjs    Gemini provider, with and without grounded search
   askHandler.mjs  POST /api/ask, GET /api/ask/status
+  snapHandler.mjs POST /api/snap, POST /api/snap/followup
+  http.mjs      shared request/response helpers
   vitePlugin.mjs  mounts the API in dev and preview
 ```
 
@@ -188,7 +192,48 @@ inventing a seam the API does not have. The boundary that matters —
 - Search failure degrades to a plain AI answer **and says so**.
 - Missing records are reported as missing, never filled in.
 
-## Not in v1.1
+## SnapHomework (v1.2)
+
+`/student/snap` is a vision tutor: photograph a task, understand it.
+It is deliberately not an answer machine — a **help level** decides how
+much is revealed, and the server enforces it rather than trusting the
+model to hold back:
+
+| Level | What comes back |
+| --- | --- |
+| Ishora / Подсказка | 1–3 progressive hints. No steps, no answer. |
+| Tushuntir / Объяснить | Concept and solution steps, **answer withheld**. |
+| Yechib koʻrsat / Показать решение | Full worked solution and the answer. |
+
+The photo is downscaled and re-encoded in the browser (max 1400px,
+JPEG), posted to `/api/snap`, and processed inside that request. It is
+never written to disk, never logged and never persisted.
+
+The reply is a **provider-validated JSON object**, not prose, so the
+client renders typed sections instead of parsing markdown. The model
+must first declare `readable` and `isSchoolTask`; when either is false
+every teaching field is blanked server-side, so a blurry photo or a
+holiday snap cannot become an invented exercise.
+
+Follow-ups reuse the AskMySchool router: ask "find me a reliable source
+online" and the same grounded-search path runs, with the same real
+citations. There is no second web provider.
+
+Maths is rendered without a formula engine — the model is told to write
+plain Unicode, and `src/lib/snap/mathText.ts` is the safety net that
+converts stray LaTeX rather than adding ~270 kB of KaTeX.
+
+### Shared AI core
+
+```
+server/gemini.mjs          one provider, one model setting
+  generate()               text, optionally grounded in Google Search
+  generateStructured()     vision + schema-validated output
+  ├── AskMySchool   -> /api/ask
+  └── SnapHomework  -> /api/snap, /api/snap/followup
+```
+
+## Not in v1.2
 
 `AI Tutor`, `ClassPulse` and `Teacher AI` are reachable and
 honestly labelled with their target version. They describe what they will do and
@@ -196,7 +241,7 @@ honestly labelled with their target version. They describe what they will do and
 future integration boundary and ships a provider that advertises no
 capabilities — no model calls, no credentials.
 
-Roadmap: v1.2 SnapHomework · v1.3 AI Planner · v1.4 AI Tutor ·
+Roadmap: v1.3 AI Planner · v1.4 AI Tutor ·
 v1.5 Quiz / Learning Loop · v1.6 Teacher expansion · v1.7 ClassPulse ·
 v1.8 School Intelligence.
 

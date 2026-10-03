@@ -9,6 +9,7 @@ import { MyDay } from '@/features/student/MyDay';
 import { Schedule } from '@/features/student/Schedule';
 import { Homework } from '@/features/student/Homework';
 import { AskSchool } from '@/features/student/ask/AskSchool';
+import { SnapHomework } from '@/features/student/snap/SnapHomework';
 import { TeacherOverview } from '@/features/teacher/TeacherOverview';
 import { Classes } from '@/features/teacher/Classes';
 import { Assignments } from '@/features/teacher/Assignments';
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: 'student/schedule', element: <Schedule /> },
       { path: 'student/homework', element: <Homework /> },
       { path: 'student/ask', element: <AskSchool /> },
+      { path: 'student/snap', element: <SnapHomework /> },
       {
         path: 'student/tutor',
         element: (

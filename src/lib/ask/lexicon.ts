@@ -14,6 +14,7 @@ export const SCHOOL_TOPIC = {
   teacher: ['ustoz', "o'qituvchi", 'muallim', 'учитель', 'преподавател', 'ведет', 'ведёт'],
   room: ['xona', 'kabinet', 'хона', 'кабинет', 'аудитор'],
   announcement: ["e'lon", 'xabar', 'объявлен'],
+  school: ['maktab', 'maktabim', 'akademiya', 'школ', 'академи'],
 } as const;
 
 /** Short words that need whole-word matching to avoid colliding. */

@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { config, hasGeminiKey } from './env.mjs';
+import { activeModel, config, hasGeminiKey, markModelExhausted } from './env.mjs';
 
 /* ------------------------------------------------------------------
    Gemini provider.
@@ -81,6 +81,60 @@ function readText(response) {
     .trim();
 }
 
+/** Google returns 429 both for per-minute rate limits and for a plan
+ *  that simply does not include a capability. Either way the caller
+ *  should stop and say so rather than retrying into the same wall. */
+export function isRateLimited(error) {
+  return error?.status === 429;
+}
+
+/* Grounded Google Search needs a billed tier. When the account does not
+   have it, every web question would otherwise burn one doomed request
+   before falling back. Remember the refusal for a while and skip
+   straight to the ungrounded answer. */
+const GROUNDING_COOLDOWN_MS = 10 * 60 * 1000;
+let groundingBlockedUntil = 0;
+
+export function isGroundingAvailable() {
+  return config.webSearchEnabled && Date.now() >= groundingBlockedUntil;
+}
+
+function noteGroundingRefused() {
+  groundingBlockedUntil = Date.now() + GROUNDING_COOLDOWN_MS;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 503 UNAVAILABLE means the model is momentarily oversubscribed, which
+ *  is worth one quick retry. 429 is a quota decision — retrying it just
+ *  delays an answer we are not going to get, so it fails fast. */
+/**
+ * Survives the two transient walls a free-tier key actually hits:
+ *   503 the model is momentarily oversubscribed -> brief retry
+ *   429 that model's daily quota is spent       -> next candidate
+ * Both end by trying the next model, so a demo keeps working.
+ */
+async function withOverloadRetry(run) {
+  const model = activeModel();
+  try {
+    return await run();
+  } catch (first) {
+    if (first?.status === 503) {
+      await sleep(1500);
+      try {
+        return await run();
+      } catch (second) {
+        if (second?.status !== 503 || !markModelExhausted(model)) throw second;
+        return run();
+      }
+    }
+    if (first?.status === 429 && markModelExhausted(model)) {
+      return run();
+    }
+    throw first;
+  }
+}
+
 /**
  * @param {object} params
  * @param {string} params.system        system instruction
@@ -90,10 +144,10 @@ function readText(response) {
  */
 export async function generate({ system, messages, web = false }) {
   const ai = getClient();
-  const useWeb = web && config.webSearchEnabled;
+  const useWeb = web && isGroundingAvailable();
 
   const request = {
-    model: config.model,
+    model: activeModel(),
     contents: messages.map((m) => ({
       role: m.role === 'model' ? 'model' : 'user',
       parts: [{ text: m.text }],
@@ -105,7 +159,15 @@ export async function generate({ system, messages, web = false }) {
     },
   };
 
-  const response = await ai.models.generateContent(request);
+  let response;
+  try {
+    response = await withOverloadRetry(() => ai.models.generateContent(request));
+  } catch (error) {
+    /* A grounded call rejected for quota tells us the capability is not
+       available on this key, not that the question was bad. */
+    if (useWeb && isRateLimited(error)) noteGroundingRefused();
+    throw error;
+  }
   const sources = useWeb ? extractSources(response) : [];
   const searchQueries = useWeb ? extractSearchQueries(response) : [];
 
@@ -119,12 +181,52 @@ export async function generate({ system, messages, web = false }) {
   };
 }
 
+/** Strips a ```json fence if the model wrapped its JSON in one. */
+function parseJson(raw) {
+  const cleaned = raw
+    .replace(/^\s*```(?:json)?/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
+  return JSON.parse(cleaned);
+}
+
+/**
+ * Structured generation, used by SnapHomework Vision. `parts` may mix
+ * text and inlineData (image) parts. The response is validated against
+ * `schema` by the provider and parsed here.
+ *
+ * @returns {Promise<object>} the parsed object
+ */
+export async function generateStructured({ system, parts, schema }) {
+  const ai = getClient();
+  const response = await withOverloadRetry(() =>
+    ai.models.generateContent({
+      model: activeModel(),
+      contents: [{ role: 'user', parts }],
+      config: {
+        systemInstruction: system,
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
+    }),
+  );
+
+  const text = readText(response);
+  if (!text) throw new Error('empty_response');
+  try {
+    return parseJson(text);
+  } catch {
+    throw new Error('malformed_response');
+  }
+}
+
 /** Cheap freshness check for questions the deterministic router is
  *  unsure about. Returns true when the answer depends on current data. */
 export async function needsFreshInformation(question) {
   const ai = getClient();
   const response = await ai.models.generateContent({
-    model: config.model,
+    model: activeModel(),
     contents: [{ role: 'user', parts: [{ text: question }] }],
     config: {
       temperature: 0,

@@ -1,4 +1,4 @@
-import { announcements as allAnnouncements } from '@/data/school';
+import { announcements as allAnnouncements, school } from '@/data/school';
 import { classHasLessonsOn, lessonsOfClass, subjectById } from '@/data/queries';
 import { resolveText } from '@/data/types';
 import type { Assignment, ID, Locale, ScheduledLesson, SchoolClass, Weekday } from '@/data/types';
@@ -90,6 +90,7 @@ interface Intent {
     teacher: boolean;
     room: boolean;
     announcement: boolean;
+    school: boolean;
   };
   ordinal: { first: boolean; next: boolean; last: boolean };
   count: boolean;
@@ -124,6 +125,7 @@ function readIntent(question: string, focus: AskFocus): Intent {
       teacher: hasStem(text, SCHOOL_TOPIC.teacher) || hasWord(text, SCHOOL_TOPIC_WORDS.teacher),
       room: hasStem(text, SCHOOL_TOPIC.room) || hasWord(text, SCHOOL_TOPIC_WORDS.room),
       announcement: hasStem(text, SCHOOL_TOPIC.announcement),
+      school: hasStem(text, SCHOOL_TOPIC.school),
     },
     ordinal: {
       first: hasStem(text, ORDINAL_CUES.first),
@@ -318,6 +320,25 @@ export function answerFromSchool(input: SchoolEngineInput): SchoolEngineResult {
         },
       ],
       [SCHEDULE_ACTION],
+    );
+  }
+
+  /* ---- school identity ------------------------------------------------
+     "Mening maktabim qaysi?" — comes from the school config, so the
+     model is never asked who we are. */
+  if (
+    intent.topic.school &&
+    !intent.topic.lesson &&
+    !intent.hasDate &&
+    !intent.count &&
+    !intent.subjectId
+  ) {
+    facts.push(
+      `School: ${resolveText(school.name, locale)}, ${resolveText(school.city, locale)}. Class: ${schoolClass.name}.`,
+    );
+    return result(
+      [{ kind: 'text', text: t('ask.a.schoolIdentity') }, { kind: 'school' }],
+      [HOME_ACTION],
     );
   }
 

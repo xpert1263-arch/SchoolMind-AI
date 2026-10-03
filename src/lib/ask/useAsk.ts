@@ -30,6 +30,7 @@ const MAX_HISTORY = 6;
 
 const ERROR_TEXT: Record<AskErrorCode, Parameters<ReturnType<typeof useI18n>['t']>[0]> = {
   missing_api_key: 'ask.error.noKey',
+  rate_limited: 'ask.error.rateLimited',
   network: 'ask.error.network',
   upstream_error: 'ask.error.upstream',
   empty_response: 'ask.error.upstream',

@@ -34,12 +34,14 @@ export type AnswerBlock =
   | { kind: 'tests'; assignmentIds: ID[] }
   | { kind: 'announcements'; announcementIds: ID[] }
   | { kind: 'subject'; subjectId: ID; teacherId: ID; room: string }
+  | { kind: 'school' }
   | { kind: 'sources'; sources: WebSource[] }
   | { kind: 'warning'; textKey: TranslationKey }
   | { kind: 'empty'; titleKey: TranslationKey; bodyKey?: TranslationKey };
 
 export type AskErrorCode =
   | 'missing_api_key'
+  | 'rate_limited'
   | 'network'
   | 'upstream_error'
   | 'empty_response'

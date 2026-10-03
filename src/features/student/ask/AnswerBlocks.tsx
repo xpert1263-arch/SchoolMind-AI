@@ -1,11 +1,20 @@
-import { ArrowUpRight, DoorClosed, Globe, GraduationCap, Info, Sparkles, User } from 'lucide-react';
-import { announcements as allAnnouncements } from '@/data/school';
+import {
+  ArrowUpRight,
+  DoorClosed,
+  Globe,
+  GraduationCap,
+  Info,
+  School,
+  Sparkles,
+  User,
+} from 'lucide-react';
+import { announcements as allAnnouncements, school } from '@/data/school';
 import { fullName, scheduledLessonById, subjectById, teacherById, toHomeworkItem } from '@/data/queries';
 import type { AnswerBlock, AnswerSource } from '@/lib/ask/types';
 import { useI18n } from '@/i18n/useI18n';
 import { cn } from '@/lib/cn';
 import { formatLongDate } from '@/lib/dates';
-import { useAllAssignments } from '@/state/selectors';
+import { useAllAssignments, useCurrentStudent } from '@/state/selectors';
 import { useApp } from '@/state/store';
 import { EmptyState } from '@/components/ui/Feedback';
 import { Panel, Rows } from '@/components/ui/Surface';
@@ -82,6 +91,7 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
   const { t, text: localized, locale } = useI18n();
   const { state, toggleAssignmentDone } = useApp();
   const assignments = useAllAssignments();
+  const currentStudent = useCurrentStudent();
 
   switch (block.kind) {
     case 'text':
@@ -172,6 +182,22 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
           <span className="flex items-center gap-1.5 text-[13px] text-ink-muted">
             <User size={14} aria-hidden className="text-ink-subtle" />
             {fullName(teacher)}
+          </span>
+        </Panel>
+      );
+    }
+
+    case 'school': {
+      const { schoolClass } = currentStudent;
+      return (
+        <Panel className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3.5">
+          <span className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+            <School size={16} aria-hidden className="text-accent-text" />
+            {localized(school.name)}
+          </span>
+          <span className="text-[13px] text-ink-muted">{localized(school.city)}</span>
+          <span className="text-[13px] text-ink-muted">
+            {t('common.class')}: {schoolClass.name}
           </span>
         </Panel>
       );

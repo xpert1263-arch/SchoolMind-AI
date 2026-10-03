@@ -24,7 +24,8 @@ import { isoFromToday } from '@/lib/dates';
    ------------------------------------------------------------------ */
 
 export const school: School = {
-  name: { uz: '41-sonli umumtaʼlim maktabi', ru: 'Школа № 41' },
+  /* A proper name: identical in both locales, never translated. */
+  name: { uz: 'Math Academy Private School', ru: 'Math Academy Private School' },
   city: { uz: 'Toshkent', ru: 'Ташкент' },
 };
 
