@@ -41,7 +41,7 @@ import {
   weekdayOfISO,
 } from '@/lib/dates';
 import { useSession } from '@/auth/AuthProvider';
-import { useApp } from './store';
+import { useApp, type AppState } from './store';
 
 /* Everything the screens render is derived here, from one assignment
    list that merges the seeded dataset with what the teacher creates. */
@@ -91,17 +91,17 @@ export function useCurrentTeacher(): { teacher: Teacher; taughtClasses: SchoolCl
 
 /** Every assignment addressed to the signed-in student's class. */
 export function useStudentItems(): HomeworkItem[] {
-  const { state } = useApp();
+  const { user } = useApp();
   const all = useAllAssignments();
   const { schoolClass } = useCurrentStudent();
   return useMemo(
     () =>
       sortHomework(
         assignmentsForClass(all, schoolClass.id).map((a) =>
-          toHomeworkItem(a, state.completedAssignmentIds),
+          toHomeworkItem(a, user.completedAssignmentIds),
         ),
       ),
-    [all, schoolClass.id, state.completedAssignmentIds],
+    [all, schoolClass.id, user.completedAssignmentIds],
   );
 }
 
@@ -220,14 +220,14 @@ export interface PersonalTaskItem {
 }
 
 export function usePersonalTasks(): PersonalTaskItem[] {
-  const { state } = useApp();
+  const { user } = useApp();
   return useMemo(
     () =>
       personalTasks.map((task) => ({
         task,
-        completed: state.completedTaskIds.includes(task.id),
+        completed: user.completedTaskIds.includes(task.id),
       })),
-    [state.completedTaskIds],
+    [user.completedTaskIds],
   );
 }
 
@@ -291,6 +291,14 @@ export function useClassSnapshots(): ClassSnapshot[] {
   );
 }
 
+/* What a teacher sees for one student: their real ticks once they
+   have signed in and done something, and a stable stand-in before
+   that, so a fresh class list is not uniformly empty. */
+function completedIdsFor(state: AppState, student: Student, all: Assignment[]): ID[] {
+  const own = state.users[student.id];
+  return own ? own.completedAssignmentIds : demoCompletedIdsFor(student.id, all);
+}
+
 export interface StudentRow {
   student: Student;
   schoolClass: SchoolClass;
@@ -304,25 +312,26 @@ export function useStudentRows(): StudentRow[] {
   const { state } = useApp();
   const all = useAllAssignments();
   const { taughtClasses } = useCurrentTeacher();
-  const signedInStudentId = useCurrentStudentId();
   return useMemo(
     () =>
       taughtClasses.flatMap((schoolClass) =>
         studentsOfClass(schoolClass.id).map((student) => {
-          const completedIds =
-            student.id === signedInStudentId
-              ? state.completedAssignmentIds
-              : demoCompletedIdsFor(student.id, all);
-          const progress = completionFor(schoolClass.id, all, completedIds);
+          const progress = completionFor(
+            schoolClass.id,
+            all,
+            completedIdsFor(state, student, all),
+          );
           return {
             student,
             schoolClass,
             ...progress,
-            isCurrentUser: student.id === signedInStudentId,
+            /* Marks the account the demo opens on, so the operator can
+               find Shohjahon in the roster at a glance. */
+            isCurrentUser: student.id === DEMO_STUDENT_ID,
           };
         }),
       ),
-    [all, taughtClasses, state.completedAssignmentIds, signedInStudentId],
+    [all, taughtClasses, state],
   );
 }
 
@@ -330,18 +339,14 @@ export function useStudentRows(): StudentRow[] {
 export function useAssignmentsForStudent(student: Student): HomeworkItem[] {
   const { state } = useApp();
   const all = useAllAssignments();
-  const signedInStudentId = useCurrentStudentId();
   return useMemo(() => {
-    const completedIds =
-      student.id === signedInStudentId
-        ? state.completedAssignmentIds
-        : demoCompletedIdsFor(student.id, all);
+    const completedIds = completedIdsFor(state, student, all);
     return sortHomework(
       assignmentsForClass(all, student.classId)
         .filter((a) => a.kind !== 'test')
         .map((a) => toHomeworkItem(a, completedIds)),
     );
-  }, [all, student, state.completedAssignmentIds, signedInStudentId]);
+  }, [all, student, state]);
 }
 
 /** Upcoming lessons for a class, starting from today. */

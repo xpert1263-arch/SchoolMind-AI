@@ -1,0 +1,100 @@
+import type { WebSource } from '@/lib/ask/types';
+import type { Difficulty, TutorAction, TutorErrorCode, TutorMode, Verdict } from './types';
+
+/* The browser's only channel to the tutor. The key stays on the
+   server; this module posts the lesson state and reads back one
+   validated turn. */
+
+const ERRORS: TutorErrorCode[] = [
+  'missing_api_key',
+  'rate_limited',
+  'network',
+  'upstream_error',
+  'malformed_response',
+  'empty_response',
+  'bad_request',
+  'server_error',
+];
+
+function toErrorCode(value: unknown): TutorErrorCode {
+  return ERRORS.includes(value as TutorErrorCode) ? (value as TutorErrorCode) : 'server_error';
+}
+
+/** The server-validated half of a turn. */
+export interface TurnPayload {
+  verdict: Verdict | null;
+  feedback: string;
+  explanation: string;
+  example: string;
+  question: string;
+  hints: string[];
+}
+
+export interface TutorRequest {
+  locale: string;
+  action: TutorAction;
+  mode: TutorMode;
+  difficulty: Difficulty;
+  subject: string;
+  topic: string;
+  studentName: string;
+  classLabel: string;
+  grade: number;
+  /** A real SchoolMind fact the tutor may refer to, or ''. */
+  schoolNote: string;
+  studentAnswer: string;
+  history: Array<{ role: 'user' | 'model'; text: string }>;
+}
+
+export type TutorResponse =
+  | {
+      ok: true;
+      turn: TurnPayload;
+      sources: WebSource[];
+      usedWeb: boolean;
+      degraded: 'web_unavailable' | 'no_results' | null;
+    }
+  | { ok: false; error: TutorErrorCode };
+
+export async function postTutor(
+  body: TutorRequest,
+  signal?: AbortSignal,
+): Promise<TutorResponse> {
+  let response: Response;
+  try {
+    response = await fetch('/api/tutor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    return { ok: false, error: 'server_error' };
+  }
+
+  const data = payload as {
+    ok?: boolean;
+    error?: unknown;
+    turn?: TurnPayload;
+    sources?: WebSource[];
+    usedWeb?: boolean;
+    degraded?: 'web_unavailable' | 'no_results' | null;
+  };
+  if (!response.ok || data.ok !== true || !data.turn) {
+    return { ok: false, error: toErrorCode(data.error) };
+  }
+  return {
+    ok: true,
+    turn: data.turn,
+    sources: Array.isArray(data.sources) ? data.sources : [],
+    usedWeb: data.usedWeb === true,
+    degraded: data.degraded ?? null,
+  };
+}

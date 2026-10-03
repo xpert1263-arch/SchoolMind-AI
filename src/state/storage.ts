@@ -4,20 +4,61 @@
  */
 
 export const STORAGE_KEY = 'schoolmind.v1';
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 
-export function readStoredState<T>(): Partial<T> | null {
+/** Reads whatever is stored, whichever version wrote it. Deciding
+ *  what an older shape means is `migrateStoredState`'s job. */
+export function readStoredState<T>(): (Partial<T> & { version?: number }) | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<T> & { version?: number };
-    if (parsed.version !== STATE_VERSION) return null;
-    return parsed;
+    return JSON.parse(raw) as Partial<T> & { version?: number };
   } catch {
     // Private mode, disabled storage, or corrupted JSON — start fresh.
     return null;
   }
 }
+
+/**
+ * Brings a stored session up to the current shape.
+ *
+ * v1 (through v1.3) held one person's work at the top level, because
+ * there was only ever one student. v1.4 keys that work by user id, so
+ * the migration files the old fields under the student the demo used
+ * to sign in as. Nothing is discarded, and nobody has to clear their
+ * browser storage to upgrade.
+ */
+export function migrateStoredState(
+  stored: (Record<string, unknown> & { version?: number }) | null,
+): (Record<string, unknown> & { version?: number }) | null {
+  if (!stored) return null;
+  if (stored.version === STATE_VERSION) return stored;
+
+  if (stored.version === 1) {
+    const { completedAssignmentIds, completedTaskIds, plan, completedPlanItemIds, ...shared } =
+      stored;
+    return {
+      ...shared,
+      version: STATE_VERSION,
+      users: {
+        [V1_STUDENT_ID]: {
+          completedAssignmentIds,
+          completedTaskIds,
+          plan,
+          completedPlanItemIds,
+          tutor: null,
+        },
+      },
+    };
+  }
+
+  /* A version we do not recognise: start clean rather than guess. */
+  return null;
+}
+
+/** The only student v1 could have belonged to. Spelled out here so
+ *  the migration does not depend on today's dataset. */
+const V1_STUDENT_ID = '9a-s1';
 
 export function writeStoredState(state: unknown): void {
   try {

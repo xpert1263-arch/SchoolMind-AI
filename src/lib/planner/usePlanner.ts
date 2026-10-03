@@ -59,11 +59,11 @@ export interface UsePlanner {
 
 export function usePlanner(): UsePlanner {
   const { t, locale } = useI18n();
-  const { state, setPlan, clearPlan, togglePlanItemDone } = useApp();
+  const { user, setPlan, clearPlan, togglePlanItemDone } = useApp();
   const { student, schoolClass } = useCurrentStudent();
   const items = useStudentItems();
 
-  const [status, setStatus] = useState<PlannerStatus>(state.plan ? 'ready' : 'idle');
+  const [status, setStatus] = useState<PlannerStatus>(user.plan ? 'ready' : 'idle');
   const [error, setError] = useState<PlannerErrorCode | null>(null);
   const [degraded, setDegraded] = useState(false);
   const [adjustments, setAdjustments] = useState<PlannerAdjustment[]>([]);
@@ -88,12 +88,12 @@ export function usePlanner(): UsePlanner {
      controls describe what is on screen rather than a stale default. */
   const restored = useRef(false);
   useEffect(() => {
-    if (restored.current || !state.plan) return;
+    if (restored.current || !user.plan) return;
     restored.current = true;
-    setAvailableMinutes(state.plan.availableMinutes);
-    setIntensity(state.plan.intensity);
-    setDegraded(state.plan.source === 'fallback');
-  }, [state.plan]);
+    setAvailableMinutes(user.plan.availableMinutes);
+    setIntensity(user.plan.intensity);
+    setDegraded(user.plan.source === 'fallback');
+  }, [user.plan]);
 
   const context = useMemo(
     () =>
@@ -113,7 +113,7 @@ export function usePlanner(): UsePlanner {
      be retranslated, so an AI plan keeps the language it was written
      in until the student generates a new one. */
   useEffect(() => {
-    const current = state.plan;
+    const current = user.plan;
     if (!current || current.source !== 'fallback' || current.locale === locale) return;
     setPlan(
       buildFallbackPlan(
@@ -121,7 +121,7 @@ export function usePlanner(): UsePlanner {
         t,
       ),
     );
-  }, [locale, state.plan, context, setPlan, t]);
+  }, [locale, user.plan, context, setPlan, t]);
 
   /** Wraps the server's half of a plan with the bookkeeping the client
    *  owns, so a persisted plan knows which day and settings it is for. */
@@ -177,7 +177,7 @@ export function usePlanner(): UsePlanner {
   const adjust = useCallback(
     (raw: string) => {
       const request = raw.trim();
-      const current = state.plan;
+      const current = user.plan;
       if (!request || !current) return;
 
       abortRef.current?.abort();
@@ -226,7 +226,7 @@ export function usePlanner(): UsePlanner {
         setStatus('ready');
       })();
     },
-    [context, locale, setPlan, state.plan, toStudyPlan],
+    [context, locale, setPlan, user.plan, toStudyPlan],
   );
 
   const discard = useCallback(() => {
@@ -240,7 +240,7 @@ export function usePlanner(): UsePlanner {
 
   /* A plan rolls over at midnight; the store drops it on load, and
      this catches a session left open across the boundary. */
-  const plan = state.plan && state.plan.dateISO === todayISO() ? state.plan : null;
+  const plan = user.plan && user.plan.dateISO === todayISO() ? user.plan : null;
 
   return {
     plan,
@@ -250,7 +250,7 @@ export function usePlanner(): UsePlanner {
     adjustments,
     capabilities,
     context,
-    completedItemIds: state.completedPlanItemIds,
+    completedItemIds: user.completedPlanItemIds,
     availableMinutes,
     intensity,
     busy: status === 'generating' || status === 'adjusting',

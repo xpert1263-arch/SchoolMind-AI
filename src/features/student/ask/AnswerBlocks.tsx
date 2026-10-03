@@ -97,7 +97,7 @@ function TextBlock({ text }: { text: string }) {
 
 export function AnswerBlockView({ block }: { block: AnswerBlock }) {
   const { t, text: localized, locale } = useI18n();
-  const { state, toggleAssignmentDone } = useApp();
+  const { user, toggleAssignmentDone } = useApp();
   const assignments = useAllAssignments();
   const currentStudent = useCurrentStudent();
 
@@ -141,7 +141,7 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
       const items = block.assignmentIds
         .map((id) => assignments.find((a) => a.id === id))
         .filter((a): a is NonNullable<typeof a> => Boolean(a))
-        .map((a) => toHomeworkItem(a, state.completedAssignmentIds));
+        .map((a) => toHomeworkItem(a, user.completedAssignmentIds));
       if (items.length === 0) return null;
       return (
         <Panel>

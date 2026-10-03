@@ -9,6 +9,7 @@ import {
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 import { plannerRoutes } from './plannerHandler.mjs';
 import { snapRoutes } from './snapHandler.mjs';
+import { tutorRoutes } from './tutorHandler.mjs';
 
 /* ------------------------------------------------------------------
    POST /api/ask        answer a question with Gemini, optionally
@@ -195,6 +196,7 @@ export function askMiddleware(req, res, next) {
 
   if (snapRoutes(req, res, url)) return;
   if (plannerRoutes(req, res, url)) return;
+  if (tutorRoutes(req, res, url)) return;
 
   if (url === '/api/ask') {
     if (req.method !== 'POST') {

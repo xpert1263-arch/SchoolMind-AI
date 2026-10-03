@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { AppMode, ID } from '@/data/types';
 import { clearStoredSession, readStoredSession, writeStoredSession } from '@/state/storage';
-import { defaultUserIdFor, matchAccount } from './credentials';
+import { defaultUserIdFor, isKnownUser, matchAccount } from './credentials';
 
 /* ------------------------------------------------------------------
    Who is signed in.
@@ -26,9 +26,12 @@ function hydrate(): Session | null {
   const stored = readStoredSession<Session>();
   if (!stored || stored.authenticated !== true) return null;
   const role: AppMode = stored.role === 'teacher' ? 'teacher' : 'student';
-  /* A user id from an older build may no longer exist; the role still
-     tells us which demo account to restore. */
-  const userId = typeof stored.userId === 'string' ? stored.userId : defaultUserIdFor(role);
+  /* A user id from an older build may name somebody the dataset no
+     longer contains; the role still says which account to restore. */
+  const userId =
+    typeof stored.userId === 'string' && isKnownUser(role, stored.userId)
+      ? stored.userId
+      : defaultUserIdFor(role);
   return { authenticated: true, role, userId };
 }
 

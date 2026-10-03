@@ -10,6 +10,7 @@ import { Homework } from '@/features/student/Homework';
 import { AskSchool } from '@/features/student/ask/AskSchool';
 import { SnapHomework } from '@/features/student/snap/SnapHomework';
 import { AiPlanner } from '@/features/student/planner/AiPlanner';
+import { AiTutor } from '@/features/student/tutor/AiTutor';
 import { TeacherOverview } from '@/features/teacher/TeacherOverview';
 import { Classes } from '@/features/teacher/Classes';
 import { Assignments } from '@/features/teacher/Assignments';
@@ -49,20 +50,7 @@ export const router = createBrowserRouter([
               { path: 'student/ask', element: <AskSchool /> },
               { path: 'student/snap', element: <SnapHomework /> },
               { path: 'student/planner', element: <AiPlanner /> },
-              {
-                path: 'student/tutor',
-                element: (
-                  <FuturePage
-                    titleKey="future.aiTutorTitle"
-                    bodyKey="future.aiTutorBody"
-                    version="v1.4"
-                    icon={<Sparkles size={22} aria-hidden />}
-                    backTo="/student/home"
-                    backLabelKey="nav.home"
-                    pointKeys={['future.aiTutorP1', 'future.aiTutorP2', 'future.aiTutorP3']}
-                  />
-                ),
-              },
+              { path: 'student/tutor', element: <AiTutor /> },
             ],
           },
 

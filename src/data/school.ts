@@ -41,6 +41,7 @@ export const lessonSlots: LessonSlot[] = [
 export const subjects: Subject[] = [
   { id: 'math', name: { uz: 'Matematika', ru: 'Математика' }, short: 'MAT', hue: 214 },
   { id: 'physics', name: { uz: 'Fizika', ru: 'Физика' }, short: 'FIZ', hue: 266 },
+  { id: 'chemistry', name: { uz: 'Kimyo', ru: 'Химия' }, short: 'KIM', hue: 95 },
   { id: 'biology', name: { uz: 'Biologiya', ru: 'Биология' }, short: 'BIO', hue: 152 },
   { id: 'english', name: { uz: 'Ingliz tili', ru: 'Английский язык' }, short: 'ENG', hue: 30 },
   { id: 'history', name: { uz: 'Tarix', ru: 'История' }, short: 'TAR', hue: 350 },
@@ -52,6 +53,7 @@ export const subjects: Subject[] = [
 const subjectRooms: Record<ID, string> = {
   math: '24',
   physics: '18',
+  chemistry: '19',
   biology: '21',
   english: '12',
   history: '30',
@@ -68,16 +70,20 @@ const subjectRooms: Record<ID, string> = {
  * Adolat carries mathematics across all three classes and physics for
  * 10-A — a normal pairing, and the reason subject choice is a real
  * decision in the assignment form rather than a single fixed value.
+ *
+ * Every row here is a permission as much as a fact: a teacher may only
+ * set work for a class and subject they appear against.
  */
 export const teachingAssignments: TeachingAssignment[] = [
-  { teacherId: 't1', subjectId: 'math', classIds: ['9a', '9b', '10a'] },
+  { teacherId: 't1', subjectId: 'math', classIds: ['8a', '9a', '10a'] },
   { teacherId: 't1', subjectId: 'physics', classIds: ['10a'] },
-  { teacherId: 't2', subjectId: 'physics', classIds: ['9a', '9b'] },
-  { teacherId: 't3', subjectId: 'biology', classIds: ['9a', '9b'] },
-  { teacherId: 't4', subjectId: 'english', classIds: ['9a', '9b', '10a'] },
-  { teacherId: 't5', subjectId: 'history', classIds: ['9a', '10a'] },
-  { teacherId: 't6', subjectId: 'native', classIds: ['9a', '9b'] },
+  { teacherId: 't2', subjectId: 'physics', classIds: ['8a', '9a'] },
+  { teacherId: 't3', subjectId: 'biology', classIds: ['8a', '9a', '10a'] },
+  { teacherId: 't4', subjectId: 'english', classIds: ['8a', '9a', '10a'] },
+  { teacherId: 't5', subjectId: 'history', classIds: ['8a', '9a', '10a'] },
+  { teacherId: 't6', subjectId: 'native', classIds: ['8a', '9a', '10a'] },
   { teacherId: 't7', subjectId: 'it', classIds: ['9a', '10a'] },
+  { teacherId: 't8', subjectId: 'chemistry', classIds: ['8a', '9a', '10a'] },
 ];
 
 interface TeacherSeed {
@@ -130,6 +136,12 @@ const teacherSeeds: TeacherSeed[] = [
     lastName: 'Qodirov',
     title: { uz: 'Informatika oʻqituvchisi', ru: 'Учитель информатики' },
   },
+  {
+    id: 't8',
+    firstName: 'Shahnoza',
+    lastName: 'Umarova',
+    title: { uz: 'Kimyo oʻqituvchisi', ru: 'Учитель химии' },
+  },
 ];
 
 /** A teacher's subjects and classes are the union of their teaching rows. */
@@ -169,47 +181,35 @@ const roster = (classId: ID, names: string[]): Student[] =>
     };
   });
 
+/* Six students per class: small enough that every one of them has a
+   real account, large enough for the teacher's class views to look
+   like a class.
+
+   9-A leads the list because account numbers follow it: student1 is
+   Shohjahon, the student the demo opens on. */
 export const students: Student[] = [
   ...roster('9a', [
     'Shohjahon Inoyatov',
-    'Malika Yusupova',
+    'Malika Rahimova',
     'Jasurbek Toʻxtasinov',
     'Nodira Abdullayeva',
-    'Sardorbek Rahimov',
-    'Gulbahor Neʼmatova',
-    'Javohir Ismoilov',
-    'Shahzoda Qodirova',
-    'Doniyor Sattorov',
+    'Javohir Sattorov',
     'Zilola Mahmudova',
-    'Bekzod Alimov',
-    'Madina Xolmatova',
-    'Temurbek Sobirov',
-    'Nilufar Tojiyeva',
   ]),
-  ...roster('9b', [
-    'Ruslan Ergashev',
-    'Dildora Nazarova',
-    'Oybek Mirzayev',
-    'Kamola Rustamova',
-    'Shohruh Umarov',
-    'Sevara Jalilova',
-    'Islom Qosimov',
-    'Anora Yoʻldosheva',
-    'Firdavs Hamroyev',
-    'Charos Qurbonova',
+  ...roster('8a', [
+    'Islombek Nazarov',
+    'Sevinch Mirzayeva',
+    'Doniyor Hamroyev',
+    'Charos Olimova',
     'Asadbek Nurmatov',
-    'Zuhra Saidova',
+    'Madina Xolmatova',
   ]),
   ...roster('10a', [
     'Ulugʻbek Toshmatov',
     'Dilshoda Ikromova',
-    'Aziz Normatov',
+    'Behruz Normatov',
     'Mohira Rasulova',
-    'Behruz Olimov',
-    'Nigora Tursunova',
     'Sanjar Yoqubov',
-    'Lola Ahmedova',
-    'Otabek Sharipov',
     'Kamila Baxtiyorova',
   ]),
 ];
@@ -218,6 +218,15 @@ const studentIdsOf = (classId: ID) => students.filter((s) => s.classId === class
 
 export const classes: SchoolClass[] = [
   {
+    id: '8a',
+    name: '8-A',
+    grade: 8,
+    letter: 'A',
+    homeroomTeacherId: 't3',
+    studentIds: studentIdsOf('8a'),
+    room: '26',
+  },
+  {
     id: '9a',
     name: '9-A',
     grade: 9,
@@ -225,15 +234,6 @@ export const classes: SchoolClass[] = [
     homeroomTeacherId: 't1',
     studentIds: studentIdsOf('9a'),
     room: '24',
-  },
-  {
-    id: '9b',
-    name: '9-B',
-    grade: 9,
-    letter: 'B',
-    homeroomTeacherId: 't3',
-    studentIds: studentIdsOf('9b'),
-    room: '26',
   },
   {
     id: '10a',
@@ -253,30 +253,34 @@ export const classes: SchoolClass[] = [
  *  teacher and no subject room is ever booked twice in one period. */
 type WeekPlan = Partial<Record<Weekday, ID[]>>;
 
+/* Laid out column by column rather than class by class: within one
+   period the three classes always take three different subjects, which
+   keeps every subject room and every teacher singly booked. Mathematics
+   and physics never share a period, because Adolat teaches both. */
 const timetables: Record<ID, WeekPlan> = {
-  '9a': {
-    1: ['math', 'physics', 'english', 'native', 'history'],
-    2: ['biology', 'math', 'it', 'english', 'native'],
-    3: ['math', 'history', 'physics', 'biology', 'english', 'it'],
-    4: ['native', 'math', 'english', 'physics', 'biology'],
-    5: ['math', 'it', 'history', 'native', 'english'],
-    6: ['biology', 'physics', 'math'],
+  '8a': {
+    1: ['math', 'native', 'biology', 'english', 'history'],
+    2: ['physics', 'chemistry', 'english', 'biology', 'history'],
+    3: ['math', 'history', 'english', 'native', 'chemistry', 'biology'],
+    4: ['physics', 'english', 'biology', 'chemistry', 'native'],
+    5: ['math', 'english', 'history', 'chemistry', 'native'],
+    6: ['biology', 'english', 'native'],
   },
-  '9b': {
-    1: ['physics', 'math', 'biology', 'english'],
-    2: ['math', 'native', 'english', 'biology'],
-    3: ['english', 'physics', 'math', 'native'],
-    4: ['math', 'biology', 'physics', 'english'],
-    5: ['native', 'math', 'english', 'biology'],
-    6: ['physics', 'math'],
+  '9a': {
+    1: ['english', 'math', 'chemistry', 'native', 'biology'],
+    2: ['biology', 'physics', 'it', 'english', 'native'],
+    3: ['history', 'math', 'biology', 'english', 'native', 'chemistry'],
+    4: ['english', 'physics', 'native', 'biology', 'it'],
+    5: ['it', 'math', 'english', 'history', 'chemistry'],
+    6: ['math', 'biology', 'history'],
   },
   '10a': {
-    1: ['history', 'english', 'it', 'math'],
-    2: ['english', 'history', 'math', 'physics'],
-    3: ['it', 'math', 'english', 'physics'],
-    4: ['english', 'history', 'math', 'it'],
-    5: ['english', 'history', 'math', 'physics'],
-    6: ['math', 'it'],
+    1: ['history', 'english', 'math', 'it', 'chemistry'],
+    2: ['it', 'english', 'physics', 'native', 'biology'],
+    3: ['english', 'biology', 'math', 'chemistry', 'history', 'it'],
+    4: ['it', 'native', 'physics', 'english', 'biology'],
+    5: ['english', 'history', 'math', 'native', 'it'],
+    6: ['english', 'math', 'chemistry'],
   },
 };
 
@@ -451,8 +455,8 @@ const assignmentSeeds: AssignmentSeed[] = [
     id: 'b1',
     kind: 'homework',
     subjectId: 'math',
-    classId: '9b',
-    title: { uz: 'Kvadrat tenglamalar — 9-mashq', ru: 'Квадратные уравнения — упражнение 9' },
+    classId: '8a',
+    title: { uz: 'Chiziqli tenglamalar — 9-mashq', ru: 'Линейные уравнения — упражнение 9' },
     description: {
       uz: 'Darslikning 45-betidagi 9-mashq, 1–8-misollar.',
       ru: 'Упражнение 9 на стр. 45, примеры 1–8.',
@@ -464,7 +468,7 @@ const assignmentSeeds: AssignmentSeed[] = [
     id: 'b2',
     kind: 'homework',
     subjectId: 'biology',
-    classId: '9b',
+    classId: '8a',
     title: { uz: 'Fotosintez — sxema', ru: 'Фотосинтез — схема' },
     description: {
       uz: 'Fotosintez bosqichlarini sxema koʻrinishida chizing.',
@@ -477,14 +481,40 @@ const assignmentSeeds: AssignmentSeed[] = [
     id: 'b3',
     kind: 'test',
     subjectId: 'math',
-    classId: '9b',
-    title: { uz: 'Nazorat ishi: kvadrat tenglamalar', ru: 'Контрольная: квадратные уравнения' },
+    classId: '8a',
+    title: { uz: 'Nazorat ishi: chiziqli tenglamalar', ru: 'Контрольная: линейные уравнения' },
     description: {
-      uz: '9-A sinf bilan bir xil variantlar.',
-      ru: 'Те же варианты, что и в 9-A.',
+      uz: 'Bir va ikki bosqichli tenglamalar, qavslarni ochish.',
+      ru: 'Уравнения в одно и два действия, раскрытие скобок.',
     },
     dueIn: 4,
     createdAgo: 5,
+  },
+  {
+    id: 'b4',
+    kind: 'homework',
+    subjectId: 'chemistry',
+    classId: '8a',
+    title: { uz: 'Atom tuzilishi — jadval', ru: 'Строение атома — таблица' },
+    description: {
+      uz: 'Birinchi 20 element uchun proton, neytron va elektron sonini jadvalga yozing.',
+      ru: 'Запишите в таблицу число протонов, нейтронов и электронов для первых 20 элементов.',
+    },
+    dueIn: 3,
+    createdAgo: 1,
+  },
+  {
+    id: 'a11',
+    kind: 'homework',
+    subjectId: 'chemistry',
+    classId: '9a',
+    title: { uz: 'Oksidlar — 10-mashq', ru: 'Оксиды — упражнение 10' },
+    description: {
+      uz: 'Oksidlarni turlarga ajrating va reaksiya tenglamalarini tenglashtiring.',
+      ru: 'Распределите оксиды по типам и уравняйте реакции.',
+    },
+    dueIn: 4,
+    createdAgo: 1,
   },
   {
     id: 'd1',
@@ -578,8 +608,8 @@ const announcementSeeds: AnnouncementSeed[] = [
     audience: 'all',
     title: { uz: 'Juma kuni 5-dars oʻzgartirildi', ru: 'В пятницу изменён 5-й урок' },
     body: {
-      uz: '9-A sinfida juma kuni 5-dars Ona tili oʻrniga Ingliz tili boʻladi.',
-      ru: 'В 9-A в пятницу 5-й урок будет английский вместо родного языка.',
+      uz: '9-A sinfida juma kuni 5-dars Kimyo xonasida (19-xona) oʻtadi.',
+      ru: 'В 9-A в пятницу 5-й урок пройдёт в кабинете химии (каб. 19).',
     },
     daysAgo: 2,
   },

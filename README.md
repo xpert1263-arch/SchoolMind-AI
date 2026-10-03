@@ -8,7 +8,7 @@ navigation, the dashboard and the available tools, but never the identity, the
 design system, the data, the theme, the language or the application state.
 
 Demo school: *Math Academy Private School*, Toshkent.
-Demo student: **Shohjahon Inoyatov, 9-A** (`student` / `student`). Demo teacher: **Adolat Qurbonova, matematika** (`teacher` / `teacher`). Local demo sign-in only — not production authentication.
+Three classes (8-A, 9-A, 10-A), 18 student accounts and 8 subject-teacher accounts. Logins are `student1`…`student18` and `teacher1`…`teacher8`, with the password equal to the username. `student1` is **Shohjahon Inoyatov, 9-A**; `teacher1` is **Adolat Qurbonova, matematika**. Local demo sign-in only — the credentials are in the client bundle and nothing is verified by a server, so this is not authentication.
 
 ---
 

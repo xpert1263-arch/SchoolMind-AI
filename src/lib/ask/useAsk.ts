@@ -61,7 +61,7 @@ export interface UseAsk {
 
 export function useAsk(): UseAsk {
   const { t, locale } = useI18n();
-  const { state } = useApp();
+  const { user } = useApp();
   const assignments = useAllAssignments();
   const { student, schoolClass } = useCurrentStudent();
 
@@ -126,7 +126,7 @@ export function useAsk(): UseAsk {
               studentName: fullName(student),
               schoolClass,
               assignments,
-              completedIds: state.completedAssignmentIds,
+              completedIds: user.completedAssignmentIds,
               focus: focusRef.current,
             })
           : null;
@@ -163,7 +163,7 @@ export function useAsk(): UseAsk {
               schoolClass,
               studentName: fullName(student),
               assignments,
-              completedIds: state.completedAssignmentIds,
+              completedIds: user.completedAssignmentIds,
               focus: focusRef.current,
               factSummary: school?.factSummary,
             })
@@ -233,7 +233,7 @@ export function useAsk(): UseAsk {
         setBusy(false);
       })();
     },
-    [assignments, busy, locale, patch, schoolClass, state.completedAssignmentIds, student, t],
+    [assignments, busy, locale, patch, schoolClass, user.completedAssignmentIds, student, t],
   );
 
   const clear = useCallback(() => {
