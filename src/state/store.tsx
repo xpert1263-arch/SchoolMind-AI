@@ -16,7 +16,9 @@ import type {
   Locale,
   Theme,
 } from '@/data/types';
-import { CURRENT_STUDENT_ID, CURRENT_TEACHER_ID, seedCompletedAssignmentIds } from '@/data/school';
+import { DEMO_STUDENT_ID, DEMO_TEACHER_ID, seedCompletedAssignmentIds } from '@/data/school';
+import { useAuth } from '@/auth/AuthProvider';
+import type { StudyPlan } from '@/lib/planner/types';
 import { todayISO } from '@/lib/dates';
 import { readStoredState, STATE_VERSION, writeStoredState } from './storage';
 
@@ -37,6 +39,12 @@ export interface AppState {
   /** Assignments created by a teacher inside the running demo. */
   createdAssignments: Assignment[];
   activity: ActivityEvent[];
+  /** The study plan AI Planner last produced, for today only. */
+  plan: StudyPlan | null;
+  /** Plan steps ticked off inside the planner. Deliberately separate
+   *  from `completedAssignmentIds`: ticking a step off a study plan is
+   *  not the same act as marking the homework itself done. */
+  completedPlanItemIds: ID[];
 }
 
 export interface AssignmentDraft {
@@ -57,15 +65,20 @@ const initialState: AppState = {
   completedTaskIds: [],
   createdAssignments: [],
   activity: [],
+  plan: null,
+  completedPlanItemIds: [],
 };
 
 type Action =
   | { type: 'setMode'; mode: AppMode }
   | { type: 'setTheme'; theme: Theme }
   | { type: 'setLocale'; locale: Locale }
-  | { type: 'toggleAssignment'; id: ID }
+  | { type: 'toggleAssignment'; id: ID; actorId: ID }
   | { type: 'toggleTask'; id: ID }
   | { type: 'createAssignment'; assignment: Assignment }
+  | { type: 'setPlan'; plan: StudyPlan }
+  | { type: 'clearPlan' }
+  | { type: 'togglePlanItem'; id: ID }
   | { type: 'reset' };
 
 const ACTIVITY_LIMIT = 12;
@@ -101,7 +114,7 @@ function reducer(state: AppState, action: Action): AppState {
           kind: done ? 'homework_reopened' : 'homework_completed',
           at: new Date().toISOString(),
           assignmentId: action.id,
-          actorId: CURRENT_STUDENT_ID,
+          actorId: action.actorId,
         }),
       };
     }
@@ -129,6 +142,24 @@ function reducer(state: AppState, action: Action): AppState {
         }),
       };
 
+    case 'setPlan':
+      /* A new plan replaces the old one, and the ticks that belonged
+         to the old one go with it. */
+      return { ...state, plan: action.plan, completedPlanItemIds: [] };
+
+    case 'clearPlan':
+      return { ...state, plan: null, completedPlanItemIds: [] };
+
+    case 'togglePlanItem': {
+      const done = state.completedPlanItemIds.includes(action.id);
+      return {
+        ...state,
+        completedPlanItemIds: done
+          ? state.completedPlanItemIds.filter((id) => id !== action.id)
+          : [...state.completedPlanItemIds, action.id],
+      };
+    }
+
     case 'reset':
       return { ...initialState };
 
@@ -152,19 +183,30 @@ function hydrate(): AppState {
     completedTaskIds: Array.isArray(stored.completedTaskIds) ? stored.completedTaskIds : [],
     createdAssignments: Array.isArray(stored.createdAssignments) ? stored.createdAssignments : [],
     activity: Array.isArray(stored.activity) ? stored.activity : [],
+    /* A plan is only ever for one day. Yesterday's is dropped on load
+       rather than shown as if it were current. */
+    plan:
+      stored.plan && typeof stored.plan === 'object' && stored.plan.dateISO === todayISO()
+        ? stored.plan
+        : null,
+    completedPlanItemIds: Array.isArray(stored.completedPlanItemIds)
+      ? stored.completedPlanItemIds
+      : [],
   };
 }
 
 export interface AppContextValue {
   state: AppState;
   setMode: (mode: AppMode) => void;
-  toggleMode: () => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   setLocale: (locale: Locale) => void;
   toggleAssignmentDone: (id: ID) => void;
   toggleTaskDone: (id: ID) => void;
   createAssignment: (draft: AssignmentDraft) => Assignment;
+  setPlan: (plan: StudyPlan) => void;
+  clearPlan: () => void;
+  togglePlanItemDone: (id: ID) => void;
   resetDemo: () => void;
 }
 
@@ -172,6 +214,12 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, hydrate);
+  const { session } = useAuth();
+
+  /* Records are attributed to whoever is signed in. With no session
+     the demo accounts stand in, so the store never depends on one. */
+  const studentId = session?.role === 'student' ? session.userId : DEMO_STUDENT_ID;
+  const teacherId = session?.role === 'teacher' ? session.userId : DEMO_TEACHER_ID;
 
   /* Persist the whole session under one key. */
   useEffect(() => {
@@ -189,39 +237,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     el.style.colorScheme = state.theme;
   }, [state.theme, state.mode, state.locale]);
 
-  const createAssignment = useCallback((draft: AssignmentDraft): Assignment => {
-    const assignment: Assignment = {
-      id: newId('as'),
-      kind: draft.kind,
-      title: draft.title.trim(),
-      description: draft.description.trim(),
-      subjectId: draft.subjectId,
-      classId: draft.classId,
-      teacherId: CURRENT_TEACHER_ID,
-      dueDate: draft.dueDate,
-      createdAt: todayISO(),
-      origin: 'teacher',
-    };
-    dispatch({ type: 'createAssignment', assignment });
-    return assignment;
-  }, []);
+  const createAssignment = useCallback(
+    (draft: AssignmentDraft): Assignment => {
+      const assignment: Assignment = {
+        id: newId('as'),
+        kind: draft.kind,
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        subjectId: draft.subjectId,
+        classId: draft.classId,
+        teacherId,
+        dueDate: draft.dueDate,
+        createdAt: todayISO(),
+        origin: 'teacher',
+      };
+      dispatch({ type: 'createAssignment', assignment });
+      return assignment;
+    },
+    [teacherId],
+  );
 
   const value = useMemo<AppContextValue>(
     () => ({
       state,
       setMode: (mode) => dispatch({ type: 'setMode', mode }),
-      toggleMode: () =>
-        dispatch({ type: 'setMode', mode: state.mode === 'student' ? 'teacher' : 'student' }),
       setTheme: (theme) => dispatch({ type: 'setTheme', theme }),
       toggleTheme: () =>
         dispatch({ type: 'setTheme', theme: state.theme === 'dark' ? 'light' : 'dark' }),
       setLocale: (locale) => dispatch({ type: 'setLocale', locale }),
-      toggleAssignmentDone: (id) => dispatch({ type: 'toggleAssignment', id }),
+      toggleAssignmentDone: (id) => dispatch({ type: 'toggleAssignment', id, actorId: studentId }),
       toggleTaskDone: (id) => dispatch({ type: 'toggleTask', id }),
       createAssignment,
+      setPlan: (plan) => dispatch({ type: 'setPlan', plan }),
+      clearPlan: () => dispatch({ type: 'clearPlan' }),
+      togglePlanItemDone: (id) => dispatch({ type: 'togglePlanItem', id }),
       resetDemo: () => dispatch({ type: 'reset' }),
     }),
-    [state, createAssignment],
+    [state, createAssignment, studentId],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

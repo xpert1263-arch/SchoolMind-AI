@@ -1,6 +1,8 @@
-import { Bell, Menu, Moon, Sun } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, LogOut, Menu, Moon, Sun } from 'lucide-react';
 import type { AppMode, Locale } from '@/data/types';
-import { findNavItem } from '@/app/navigation';
+import { findNavItem, modeIcons } from '@/app/navigation';
+import { useAuth } from '@/auth/AuthProvider';
 import { fullName, initialsOf } from '@/data/queries';
 import { locales, localeLabels } from '@/i18n';
 import { useI18n } from '@/i18n/useI18n';
@@ -12,17 +14,14 @@ import { Popover } from '@/components/ui/Popover';
 import { LogoMark } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/dates';
-import { ModeSwitch } from './ModeSwitch';
 
 export function Topbar({
   mode,
   pathname,
-  onChangeMode,
   onOpenMenu,
 }: {
   mode: AppMode;
   pathname: string;
-  onChangeMode: (mode: AppMode) => void;
   onOpenMenu: () => void;
 }) {
   const { t, locale } = useI18n();
@@ -59,13 +58,16 @@ export function Topbar({
         </div>
       </div>
 
-      <div className="mx-auto">
-        <ModeSwitch mode={mode} onChange={onChangeMode} />
+      {/* Where the Student/Teacher switch used to be. Since v1.3 the
+          role comes from the login, so this says who is signed in
+          instead of offering to become somebody else. */}
+      <div className="mx-auto hidden min-w-0 sm:block">
+        <SignedInChip mode={mode} />
       </div>
 
-      {/* Phones carry only the mode switch and notifications here;
-          language, theme and the profile live in the slide-over menu,
-          so the bar stays legible at 375px. */}
+      {/* Phones carry only notifications here; language, theme, the
+          profile and sign-out live in the slide-over menu, so the bar
+          stays legible at 375px. */}
       <div className="flex shrink-0 items-center gap-1">
         <span className="hidden sm:flex">
           <LocaleToggle locale={locale} onChange={setLocale} />
@@ -87,7 +89,7 @@ export function Topbar({
         <span className="hidden sm:block">
           <Popover
             label={t('a11y.profile')}
-            widthClass="w-60"
+            widthClass="w-64"
             trigger={({ toggle }) => (
               <button
                 type="button"
@@ -107,6 +109,31 @@ export function Topbar({
   );
 }
 
+/** Name, role and class of whoever is signed in. */
+function SignedInChip({ mode }: { mode: AppMode }) {
+  const { t } = useI18n();
+  const { student, schoolClass } = useCurrentStudent();
+  const { teacher } = useCurrentTeacher();
+  const Icon = modeIcons[mode];
+
+  const person = mode === 'student' ? student : teacher;
+  const caption =
+    mode === 'student' ? `${t('mode.student')} · ${schoolClass.name}` : t('mode.teacher');
+
+  return (
+    <div className="flex min-w-0 items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-1.5 shadow-subtle">
+      <Avatar name={fullName(person)} initials={initialsOf(person)} size={26} />
+      <div className="min-w-0 leading-tight">
+        <p className="truncate text-[13px] font-medium text-ink">{fullName(person)}</p>
+        <p className="flex items-center gap-1 truncate text-[11px] text-ink-subtle">
+          <Icon size={10} aria-hidden />
+          {caption}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function LocaleToggle({ locale, onChange }: { locale: Locale; onChange: (l: Locale) => void }) {
   const { t } = useI18n();
   return (
@@ -123,9 +150,7 @@ function LocaleToggle({ locale, onChange }: { locale: Locale; onChange: (l: Loca
           aria-pressed={value === locale}
           className={cn(
             'rounded px-1.5 py-1 text-[11px] font-semibold transition-colors',
-            value === locale
-              ? 'bg-surface-muted text-ink'
-              : 'text-ink-subtle hover:text-ink',
+            value === locale ? 'bg-surface-muted text-ink' : 'text-ink-subtle hover:text-ink',
           )}
         >
           {localeLabels[value]}
@@ -202,16 +227,45 @@ function ProfileCard({ mode }: { mode: AppMode }) {
 
   return (
     <div className="p-3.5">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-subtle">
+        {t('auth.signedInAs')}
+      </p>
       <div className="flex items-center gap-2.5">
         <Avatar name={fullName(person)} initials={initialsOf(person)} size={36} />
         <div className="min-w-0">
           <p className="truncate text-[13px] font-medium text-ink">{fullName(person)}</p>
-          <p className="truncate text-[12px] text-ink-subtle">{caption}</p>
+          <p className="truncate text-[12px] text-ink-subtle">
+            {t(`mode.${mode}`)} · {caption}
+          </p>
         </div>
       </div>
-      <p className="mt-3 rounded-md bg-surface-muted px-2.5 py-2 text-[11.5px] text-ink-subtle">
-        {t('settings.demoAccount')}
+      <p className="mt-3 rounded-md bg-surface-muted px-2.5 py-2 text-[11.5px] leading-relaxed text-ink-subtle">
+        {t('auth.demoNote')}
       </p>
+      <LogoutButton className="mt-3 w-full" />
     </div>
+  );
+}
+
+/** Ends the session and nothing else — school data, teacher-created
+ *  assignments and the study plan all survive signing out. */
+export function LogoutButton({ className }: { className?: string }) {
+  const { t } = useI18n();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      className={className}
+      iconLeft={<LogOut size={14} aria-hidden />}
+      onClick={() => {
+        signOut();
+        navigate('/login', { replace: true });
+      }}
+    >
+      {t('auth.logout')}
+    </Button>
   );
 }

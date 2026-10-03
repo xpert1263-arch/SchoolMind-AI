@@ -65,7 +65,7 @@ const subjectRooms: Record<ID, string> = {
  * the assignment form all derive from it, so a teacher is never offered
  * a subject they do not actually teach to the selected class.
  *
- * Nilufar carries mathematics across all three classes and physics for
+ * Adolat carries mathematics across all three classes and physics for
  * 10-A — a normal pairing, and the reason subject choice is a real
  * decision in the assignment form rather than a single fixed value.
  */
@@ -90,8 +90,8 @@ interface TeacherSeed {
 const teacherSeeds: TeacherSeed[] = [
   {
     id: 't1',
-    firstName: 'Nilufar',
-    lastName: 'Rashidova',
+    firstName: 'Adolat',
+    lastName: 'Qurbonova',
     title: { uz: 'Matematika va fizika oʻqituvchisi', ru: 'Учитель математики и физики' },
   },
   {
@@ -171,7 +171,7 @@ const roster = (classId: ID, names: string[]): Student[] =>
 
 export const students: Student[] = [
   ...roster('9a', [
-    'Azizbek Karimov',
+    'Shohjahon Inoyatov',
     'Malika Yusupova',
     'Jasurbek Toʻxtasinov',
     'Nodira Abdullayeva',
@@ -638,7 +638,7 @@ export const personalTasks: PersonalTask[] = personalTaskSeeds.map(({ dueIn, ...
 
 /* ---- demo identities ------------------------------------------------- */
 
-/** Azizbek Karimov, 9-A — the student the demo is signed in as. */
-export const CURRENT_STUDENT_ID: ID = '9a-s1';
-/** Nilufar Rashidova, mathematics — the teacher the demo is signed in as. */
-export const CURRENT_TEACHER_ID: ID = 't1';
+/** Shohjahon Inoyatov, 9-A — the student a `student` login signs in as. */
+export const DEMO_STUDENT_ID: ID = '9a-s1';
+/** Adolat Qurbonova, mathematics — the teacher a `teacher` login signs in as. */
+export const DEMO_TEACHER_ID: ID = 't1';

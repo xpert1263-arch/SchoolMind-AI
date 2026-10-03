@@ -15,6 +15,21 @@ export const SCHOOL_TOPIC = {
   room: ['xona', 'kabinet', 'хона', 'кабинет', 'аудитор'],
   announcement: ["e'lon", 'xabar', 'объявлен'],
   school: ['maktab', 'maktabim', 'akademiya', 'школ', 'академи'],
+  /* First-person forms only. A bare "ism" or "класс" would fire on
+     general questions; "ismim" and "sinfim" cannot. */
+  identity: ['ismim', 'ismimni', 'familiyam', 'kimman', 'меня зовут', 'мое имя', 'моё имя', 'кто я'],
+  myClass: [
+    'sinfim',
+    'sinfda',
+    'sinfdaman',
+    "o'qiyman",
+    'мой класс',
+    'моем классе',
+    'моём классе',
+    'каком классе',
+    'какой класс',
+    'учусь',
+  ],
 } as const;
 
 /** Short words that need whole-word matching to avoid colliding. */

@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import {
   announcements,
   classes,
-  CURRENT_STUDENT_ID,
-  CURRENT_TEACHER_ID,
+  DEMO_STUDENT_ID,
+  DEMO_TEACHER_ID,
   personalTasks,
   seedAssignments,
 } from '@/data/school';
@@ -40,6 +40,7 @@ import {
   weekdayOf,
   weekdayOfISO,
 } from '@/lib/dates';
+import { useSession } from '@/auth/AuthProvider';
 import { useApp } from './store';
 
 /* Everything the screens render is derived here, from one assignment
@@ -53,21 +54,37 @@ export function useAllAssignments(): Assignment[] {
   );
 }
 
+/* The signed-in identity, with the demo account as the fallback so a
+   screen rendered outside a session (or the other workspace's topbar)
+   still has somebody to show. */
+
+export function useCurrentStudentId(): ID {
+  const session = useSession();
+  return session?.role === 'student' ? session.userId : DEMO_STUDENT_ID;
+}
+
+export function useCurrentTeacherId(): ID {
+  const session = useSession();
+  return session?.role === 'teacher' ? session.userId : DEMO_TEACHER_ID;
+}
+
 export function useCurrentStudent(): { student: Student; schoolClass: SchoolClass } {
+  const id = useCurrentStudentId();
   return useMemo(() => {
-    const student = studentById(CURRENT_STUDENT_ID);
+    const student = studentById(id);
     return { student, schoolClass: classById(student.classId) };
-  }, []);
+  }, [id]);
 }
 
 export function useCurrentTeacher(): { teacher: Teacher; taughtClasses: SchoolClass[] } {
+  const id = useCurrentTeacherId();
   return useMemo(() => {
-    const teacher = teacherById(CURRENT_TEACHER_ID);
+    const teacher = teacherById(id);
     return {
       teacher,
       taughtClasses: classes.filter((c) => teacher.classIds.includes(c.id)),
     };
-  }, []);
+  }, [id]);
 }
 
 /* ---- student ------------------------------------------------------- */
@@ -287,12 +304,13 @@ export function useStudentRows(): StudentRow[] {
   const { state } = useApp();
   const all = useAllAssignments();
   const { taughtClasses } = useCurrentTeacher();
+  const signedInStudentId = useCurrentStudentId();
   return useMemo(
     () =>
       taughtClasses.flatMap((schoolClass) =>
         studentsOfClass(schoolClass.id).map((student) => {
           const completedIds =
-            student.id === CURRENT_STUDENT_ID
+            student.id === signedInStudentId
               ? state.completedAssignmentIds
               : demoCompletedIdsFor(student.id, all);
           const progress = completionFor(schoolClass.id, all, completedIds);
@@ -300,11 +318,11 @@ export function useStudentRows(): StudentRow[] {
             student,
             schoolClass,
             ...progress,
-            isCurrentUser: student.id === CURRENT_STUDENT_ID,
+            isCurrentUser: student.id === signedInStudentId,
           };
         }),
       ),
-    [all, taughtClasses, state.completedAssignmentIds],
+    [all, taughtClasses, state.completedAssignmentIds, signedInStudentId],
   );
 }
 
@@ -312,9 +330,10 @@ export function useStudentRows(): StudentRow[] {
 export function useAssignmentsForStudent(student: Student): HomeworkItem[] {
   const { state } = useApp();
   const all = useAllAssignments();
+  const signedInStudentId = useCurrentStudentId();
   return useMemo(() => {
     const completedIds =
-      student.id === CURRENT_STUDENT_ID
+      student.id === signedInStudentId
         ? state.completedAssignmentIds
         : demoCompletedIdsFor(student.id, all);
     return sortHomework(
@@ -322,7 +341,7 @@ export function useAssignmentsForStudent(student: Student): HomeworkItem[] {
         .filter((a) => a.kind !== 'test')
         .map((a) => toHomeworkItem(a, completedIds)),
     );
-  }, [all, student, state.completedAssignmentIds]);
+  }, [all, student, state.completedAssignmentIds, signedInStudentId]);
 }
 
 /** Upcoming lessons for a class, starting from today. */

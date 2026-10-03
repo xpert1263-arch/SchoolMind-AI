@@ -123,6 +123,7 @@ export function useAsk(): UseAsk {
               question,
               locale,
               t,
+              studentName: fullName(student),
               schoolClass,
               assignments,
               completedIds: state.completedAssignmentIds,

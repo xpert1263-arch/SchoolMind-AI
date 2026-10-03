@@ -1,6 +1,7 @@
 import {
   BookOpenCheck,
   CalendarDays,
+  CalendarCheck,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
@@ -49,6 +50,7 @@ export const studentNav: NavGroup[] = [
     items: [
       { to: '/student/ask', labelKey: 'nav.askSchool', icon: MessagesSquare },
       { to: '/student/snap', labelKey: 'nav.snapHomework', icon: ScanLine },
+      { to: '/student/planner', labelKey: 'nav.aiPlanner', icon: CalendarCheck },
       { to: '/student/tutor', labelKey: 'nav.aiTutor', icon: Sparkles, futureVersion: 'v1.4' },
     ],
   },

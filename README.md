@@ -8,7 +8,7 @@ navigation, the dashboard and the available tools, but never the identity, the
 design system, the data, the theme, the language or the application state.
 
 Demo school: *Math Academy Private School*, Toshkent.
-Demo student: **Azizbek Karimov, 9-A**. Demo teacher: **Nilufar Rashidova, matematika**.
+Demo student: **Shohjahon Inoyatov, 9-A** (`student` / `student`). Demo teacher: **Adolat Qurbonova, matematika** (`teacher` / `teacher`). Local demo sign-in only — not production authentication.
 
 ---
 

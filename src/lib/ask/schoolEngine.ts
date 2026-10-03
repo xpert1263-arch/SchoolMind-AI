@@ -34,6 +34,8 @@ export interface SchoolEngineInput {
   question: string;
   locale: Locale;
   t: Translator;
+  /** The signed-in student, so "what is my name" is a record lookup. */
+  studentName: string;
   schoolClass: SchoolClass;
   assignments: Assignment[];
   completedIds: ID[];
@@ -91,6 +93,8 @@ interface Intent {
     room: boolean;
     announcement: boolean;
     school: boolean;
+    identity: boolean;
+    myClass: boolean;
   };
   ordinal: { first: boolean; next: boolean; last: boolean };
   count: boolean;
@@ -126,6 +130,8 @@ function readIntent(question: string, focus: AskFocus): Intent {
       room: hasStem(text, SCHOOL_TOPIC.room) || hasWord(text, SCHOOL_TOPIC_WORDS.room),
       announcement: hasStem(text, SCHOOL_TOPIC.announcement),
       school: hasStem(text, SCHOOL_TOPIC.school),
+      identity: hasStem(text, SCHOOL_TOPIC.identity),
+      myClass: hasStem(text, SCHOOL_TOPIC.myClass),
     },
     ordinal: {
       first: hasStem(text, ORDINAL_CUES.first),
@@ -158,7 +164,7 @@ function findNextLesson(
 }
 
 export function answerFromSchool(input: SchoolEngineInput): SchoolEngineResult {
-  const { locale, t, schoolClass, assignments, completedIds, focus } = input;
+  const { locale, t, studentName, schoolClass, assignments, completedIds, focus } = input;
   const intent = readIntent(input.question, focus);
 
   const classAssignments = assignments.filter((a) => a.classId === schoolClass.id);
@@ -319,6 +325,32 @@ export function answerFromSchool(input: SchoolEngineInput): SchoolEngineResult {
           room: sample.entry.lesson.room,
         },
       ],
+      [SCHEDULE_ACTION],
+    );
+  }
+
+  /* ---- who the student is ---------------------------------------------
+     "Mening ismim nima?", "Qaysi sinfda oʻqiyman?" — the signed-in
+     identity, read from the session and the roster. The model is never
+     asked to remember the student's own name. */
+  if (intent.topic.identity && !intent.topic.lesson && !intent.topic.homework) {
+    facts.push(`Student: ${studentName}, class ${schoolClass.name}.`);
+    return result(
+      [{ kind: 'text', text: t('ask.a.studentIdentity') }, { kind: 'profile' }],
+      [HOME_ACTION],
+    );
+  }
+
+  if (
+    intent.topic.myClass &&
+    !intent.topic.lesson &&
+    !intent.topic.homework &&
+    !intent.topic.test &&
+    !intent.subjectId
+  ) {
+    facts.push(`Student: ${studentName}, class ${schoolClass.name}.`);
+    return result(
+      [{ kind: 'text', text: t('ask.a.classIdentity') }, { kind: 'profile' }],
       [SCHEDULE_ACTION],
     );
   }

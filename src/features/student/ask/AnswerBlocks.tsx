@@ -9,13 +9,21 @@ import {
   User,
 } from 'lucide-react';
 import { announcements as allAnnouncements, school } from '@/data/school';
-import { fullName, scheduledLessonById, subjectById, teacherById, toHomeworkItem } from '@/data/queries';
+import {
+  fullName,
+  initialsOf,
+  scheduledLessonById,
+  subjectById,
+  teacherById,
+  toHomeworkItem,
+} from '@/data/queries';
 import type { AnswerBlock, AnswerSource } from '@/lib/ask/types';
 import { useI18n } from '@/i18n/useI18n';
 import { cn } from '@/lib/cn';
 import { formatLongDate } from '@/lib/dates';
 import { useAllAssignments, useCurrentStudent } from '@/state/selectors';
 import { useApp } from '@/state/store';
+import { Avatar } from '@/components/ui/Display';
 import { EmptyState } from '@/components/ui/Feedback';
 import { Panel, Rows } from '@/components/ui/Surface';
 import { SubjectDot } from '@/components/ui/Status';
@@ -183,6 +191,22 @@ export function AnswerBlockView({ block }: { block: AnswerBlock }) {
             <User size={14} aria-hidden className="text-ink-subtle" />
             {fullName(teacher)}
           </span>
+        </Panel>
+      );
+    }
+
+    case 'profile': {
+      const { student, schoolClass } = currentStudent;
+      return (
+        <Panel className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3.5">
+          <span className="flex items-center gap-2.5">
+            <Avatar name={fullName(student)} initials={initialsOf(student)} size={32} />
+            <span className="text-[15px] font-semibold text-ink">{fullName(student)}</span>
+          </span>
+          <span className="text-[13px] text-ink-muted">
+            {t('mode.student')} · {schoolClass.name}
+          </span>
+          <span className="text-[13px] text-ink-muted">{localized(school.name)}</span>
         </Panel>
       );
     }

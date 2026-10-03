@@ -7,6 +7,7 @@ import {
   needsFreshInformation,
 } from './gemini.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
+import { plannerRoutes } from './plannerHandler.mjs';
 import { snapRoutes } from './snapHandler.mjs';
 
 /* ------------------------------------------------------------------
@@ -193,6 +194,7 @@ export function askMiddleware(req, res, next) {
   }
 
   if (snapRoutes(req, res, url)) return;
+  if (plannerRoutes(req, res, url)) return;
 
   if (url === '/api/ask') {
     if (req.method !== 'POST') {

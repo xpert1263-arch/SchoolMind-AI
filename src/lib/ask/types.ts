@@ -35,6 +35,7 @@ export type AnswerBlock =
   | { kind: 'announcements'; announcementIds: ID[] }
   | { kind: 'subject'; subjectId: ID; teacherId: ID; room: string }
   | { kind: 'school' }
+  | { kind: 'profile' }
   | { kind: 'sources'; sources: WebSource[] }
   | { kind: 'warning'; textKey: TranslationKey }
   | { kind: 'empty'; titleKey: TranslationKey; bodyKey?: TranslationKey };

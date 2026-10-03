@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/cn';
 import { NavList } from './NavList';
-import { ModeSwitch } from './ModeSwitch';
+import { LogoutButton } from './Topbar';
 import { WorkspaceBadge } from './WorkspaceBadge';
 
 const EASE = [0.32, 0.72, 0, 1] as const;
@@ -68,12 +68,10 @@ export function MobileMenu({
   open,
   onClose,
   mode,
-  onChangeMode,
 }: {
   open: boolean;
   onClose: () => void;
   mode: AppMode;
-  onChangeMode: (mode: AppMode) => void;
 }) {
   const { t, text, locale } = useI18n();
   const { state, setLocale, toggleTheme } = useApp();
@@ -112,9 +110,6 @@ export function MobileMenu({
             </div>
 
             <div className="sm-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4">
-              <div className="mb-4 flex justify-center">
-                <ModeSwitch mode={mode} onChange={onChangeMode} />
-              </div>
               <div className="mb-4">
                 <WorkspaceBadge mode={mode} />
               </div>
@@ -148,6 +143,7 @@ export function MobileMenu({
                   {isDark ? t('settings.light') : t('settings.dark')}
                 </Button>
               </div>
+              <LogoutButton className="mt-3 w-full" />
               <p className="mt-3 truncate text-[11.5px] text-ink-subtle">{text(school.name)}</p>
             </div>
           </motion.div>
