@@ -3,7 +3,7 @@ import {
   AiUnavailableError,
   generate,
   isGroundingAvailable,
-  isRateLimited,
+  isTemporarilyUnavailable,
   needsFreshInformation,
 } from './gemini.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
@@ -173,7 +173,8 @@ async function handleAsk(req, res) {
       send(res, 503, { ok: false, error: error.reason });
       return;
     }
-    if (isRateLimited(error)) {
+    if (isTemporarilyUnavailable(error)) {
+      logFailure(`all models unavailable (status ${error?.status})`, error);
       send(res, 429, { ok: false, error: 'rate_limited' });
       return;
     }

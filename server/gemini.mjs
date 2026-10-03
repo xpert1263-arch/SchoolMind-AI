@@ -88,6 +88,12 @@ export function isRateLimited(error) {
   return error?.status === 429;
 }
 
+/** Every candidate was either out of quota or busy. From the student's
+ *  side both mean the same thing: the assistant cannot answer now. */
+export function isTemporarilyUnavailable(error) {
+  return error?.status === 429 || error?.status === 503;
+}
+
 /* Grounded Google Search needs a billed tier. When the account does not
    have it, every web question would otherwise burn one doomed request
    before falling back. Remember the refusal for a while and skip
@@ -105,34 +111,66 @@ function noteGroundingRefused() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 503 UNAVAILABLE means the model is momentarily oversubscribed, which
- *  is worth one quick retry. 429 is a quota decision — retrying it just
- *  delays an answer we are not going to get, so it fails fast. */
+/** A 503 is momentary oversubscription; park the model only briefly. */
+const BUSY_COOLDOWN_MS = 60 * 1000;
+
 /**
- * Survives the two transient walls a free-tier key actually hits:
- *   503 the model is momentarily oversubscribed -> brief retry
- *   429 that model's daily quota is spent       -> next candidate
- * Both end by trying the next model, so a demo keeps working.
+ * Walks the candidate models until one answers.
+ *
+ * A free-tier key hits two different walls, and they can chain: the
+ * preferred model returns 429 because its daily quota is spent, and the
+ * next one returns 503 because it is busy. Handling only one hop — as
+ * this did originally — turned that pair into a hard failure.
+ *
+ *   429  quota spent        -> park 30 min, next candidate
+ *   503  busy               -> one quick retry, then park 1 min, next
+ *   anything else           -> a real error, surface it immediately
+ *
+ * `run` receives the model to use, so each attempt targets the right one.
+ *
+ * `onQuota` says what a 429 means for this call. For an ordinary
+ * request it means the model is spent, so park it. For a *grounded*
+ * request it usually means the plan lacks Google Search, which says
+ * nothing about the model's plain-text quota — parking it there would
+ * needlessly degrade every later answer.
  */
-async function withOverloadRetry(run) {
-  const model = activeModel();
-  try {
-    return await run();
-  } catch (first) {
-    if (first?.status === 503) {
-      await sleep(1500);
-      try {
-        return await run();
-      } catch (second) {
-        if (second?.status !== 503 || !markModelExhausted(model)) throw second;
-        return run();
+async function withModelFailover(run, { onQuota = 'park' } = {}) {
+  const attempted = new Set();
+  let lastError;
+
+  while (attempted.size < config.models.length) {
+    const model = activeModel();
+    if (attempted.has(model)) break;
+    attempted.add(model);
+
+    try {
+      return await run(model);
+    } catch (error) {
+      lastError = error;
+
+      if (error?.status === 503) {
+        await sleep(1500);
+        try {
+          return await run(model);
+        } catch (retryError) {
+          lastError = retryError;
+          if (retryError?.status !== 503 && retryError?.status !== 429) throw retryError;
+          markModelExhausted(model, BUSY_COOLDOWN_MS);
+          continue;
+        }
       }
+
+      if (error?.status === 429) {
+        if (onQuota === 'abort') throw error;
+        markModelExhausted(model);
+        continue;
+      }
+
+      throw error;
     }
-    if (first?.status === 429 && markModelExhausted(model)) {
-      return run();
-    }
-    throw first;
   }
+
+  throw lastError;
 }
 
 /**
@@ -146,8 +184,8 @@ export async function generate({ system, messages, web = false }) {
   const ai = getClient();
   const useWeb = web && isGroundingAvailable();
 
-  const request = {
-    model: activeModel(),
+  const buildRequest = (model) => ({
+    model,
     contents: messages.map((m) => ({
       role: m.role === 'model' ? 'model' : 'user',
       parts: [{ text: m.text }],
@@ -157,11 +195,13 @@ export async function generate({ system, messages, web = false }) {
       temperature: 0.3,
       ...(useWeb ? { tools: [{ googleSearch: {} }] } : {}),
     },
-  };
+  });
 
   let response;
   try {
-    response = await withOverloadRetry(() => ai.models.generateContent(request));
+    response = await withModelFailover((model) => ai.models.generateContent(buildRequest(model)), {
+      onQuota: useWeb ? 'abort' : 'park',
+    });
   } catch (error) {
     /* A grounded call rejected for quota tells us the capability is not
        available on this key, not that the question was bad. */
@@ -199,9 +239,9 @@ function parseJson(raw) {
  */
 export async function generateStructured({ system, parts, schema }) {
   const ai = getClient();
-  const response = await withOverloadRetry(() =>
+  const response = await withModelFailover((model) =>
     ai.models.generateContent({
-      model: activeModel(),
+      model,
       contents: [{ role: 'user', parts }],
       config: {
         systemInstruction: system,
@@ -225,17 +265,19 @@ export async function generateStructured({ system, parts, schema }) {
  *  unsure about. Returns true when the answer depends on current data. */
 export async function needsFreshInformation(question) {
   const ai = getClient();
-  const response = await ai.models.generateContent({
-    model: activeModel(),
-    contents: [{ role: 'user', parts: [{ text: question }] }],
-    config: {
-      temperature: 0,
-      systemInstruction:
-        'You classify a student question. Answer with exactly one word: ' +
-        'WEB if answering correctly requires current, real-time or recent information ' +
-        '(news, prices, weather, events, anything time-sensitive or post-training). ' +
-        'KNOWLEDGE if stable general knowledge is enough. No punctuation, no explanation.',
-    },
-  });
+  const response = await withModelFailover((model) =>
+    ai.models.generateContent({
+      model,
+      contents: [{ role: 'user', parts: [{ text: question }] }],
+      config: {
+        temperature: 0,
+        systemInstruction:
+          'You classify a student question. Answer with exactly one word: ' +
+          'WEB if answering correctly requires current, real-time or recent information ' +
+          '(news, prices, weather, events, anything time-sensitive or post-training). ' +
+          'KNOWLEDGE if stable general knowledge is enough. No punctuation, no explanation.',
+      },
+    }),
+  );
   return readText(response).toUpperCase().includes('WEB');
 }

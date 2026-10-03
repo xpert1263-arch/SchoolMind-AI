@@ -4,7 +4,7 @@ import {
   generate,
   generateStructured,
   isGroundingAvailable,
-  isRateLimited,
+  isTemporarilyUnavailable,
 } from './gemini.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 
@@ -231,7 +231,8 @@ async function handleAnalyse(req, res) {
       send(res, 503, { ok: false, error: error.reason });
       return;
     }
-    if (isRateLimited(error)) {
+    if (isTemporarilyUnavailable(error)) {
+      logFailure(`all models unavailable (status ${error?.status})`, error);
       send(res, 429, { ok: false, error: 'rate_limited' });
       return;
     }
@@ -322,7 +323,8 @@ async function handleFollowUp(req, res) {
       send(res, 503, { ok: false, error: error.reason });
       return;
     }
-    if (isRateLimited(error)) {
+    if (isTemporarilyUnavailable(error)) {
+      logFailure(`all models unavailable (status ${error?.status})`, error);
       send(res, 429, { ok: false, error: 'rate_limited' });
       return;
     }

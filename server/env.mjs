@@ -51,7 +51,7 @@ export const config = {
      GEMINI_MODEL pins one explicitly and disables failover. */
   models: envValue('GEMINI_MODEL')
     ? [envValue('GEMINI_MODEL')]
-    : ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-flash-latest'],
+    : ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'],
   /** Lets an operator turn grounded search off without removing the key. */
   webSearchEnabled: (envValue('ASKMYSCHOOL_WEB_SEARCH') ?? 'on') !== 'off',
 };
@@ -75,10 +75,11 @@ export function activeModel() {
   return config.models.find(isUsable) ?? config.models[0];
 }
 
-/** Park `model` after a quota refusal.
+/** Park `model` after a refusal. Quota refusals park for 30 minutes;
+ *  a momentary busy signal parks for far less.
  *  Returns true when a different candidate is available to retry with. */
-export function markModelExhausted(model) {
-  exhaustedUntil.set(model, Date.now() + QUOTA_COOLDOWN_MS);
+export function markModelExhausted(model, cooldownMs = QUOTA_COOLDOWN_MS) {
+  exhaustedUntil.set(model, Date.now() + cooldownMs);
   const next = config.models.find(isUsable);
   if (!next || next === model) return false;
   console.info(`[schoolmind-ai] ${model} quota exhausted, falling back to ${next}`);
