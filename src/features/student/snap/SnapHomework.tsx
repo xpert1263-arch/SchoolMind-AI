@@ -17,6 +17,7 @@ const ERROR_KEY: Record<SnapErrorCode, TranslationKey> = {
   missing_api_key: 'snap.errNoKey',
   rate_limited: 'snap.errRateLimited',
   network: 'snap.errNetwork',
+  timeout: 'snap.errTimeout',
   upstream_error: 'snap.errUpstream',
   malformed_response: 'snap.errMalformed',
   empty_response: 'snap.errUpstream',
@@ -88,7 +89,7 @@ export function SnapHomework() {
         </p>
       </header>
 
-      {snap.capabilities && !snap.capabilities.geminiConfigured ? (
+      {snap.capabilities && !snap.capabilities.visionConfigured ? (
         <div className="flex items-start gap-2.5 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-3">
           <Info size={15} aria-hidden className="mt-0.5 shrink-0 text-warn-text" />
           <div className="min-w-0">

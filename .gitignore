@@ -22,6 +22,10 @@ pnpm-debug.log*
 !.env.example
 *.pem
 
+# Parent Connect records: names, phone numbers and Telegram chat ids.
+# Personal data and server-side state — never committed.
+.schoolmind/
+
 # editor / os
 .vscode/*
 !.vscode/extensions.json

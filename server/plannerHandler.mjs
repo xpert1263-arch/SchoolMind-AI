@@ -1,5 +1,6 @@
-import { hasGeminiKey } from './env.mjs';
-import { AiUnavailableError, generateStructured, isTemporarilyUnavailable } from './gemini.mjs';
+import { hasAnyAiKey } from './env.mjs';
+import { generateStructured } from './ai/index.mjs';
+import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 
 /* ------------------------------------------------------------------
@@ -344,7 +345,7 @@ async function handlePlan(req, res, { adjust }) {
     send(res, 400, { ok: false, error: 'bad_request' });
     return;
   }
-  if (!hasGeminiKey) {
+  if (!hasAnyAiKey) {
     send(res, 503, { ok: false, error: 'missing_api_key' });
     return;
   }
@@ -366,23 +367,7 @@ async function handlePlan(req, res, { adjust }) {
 
     send(res, 200, { ok: true, plan });
   } catch (error) {
-    if (error instanceof AiUnavailableError) {
-      send(res, 503, { ok: false, error: error.reason });
-      return;
-    }
-    if (isTemporarilyUnavailable(error)) {
-      logFailure(`all models unavailable (status ${error?.status})`, error);
-      send(res, 429, { ok: false, error: 'rate_limited' });
-      return;
-    }
-    const message = error instanceof Error ? error.message : '';
-    if (message === 'malformed_response' || message === 'empty_response') {
-      logFailure('planner', error);
-      send(res, 502, { ok: false, error: message });
-      return;
-    }
-    logFailure('planner', error);
-    send(res, 502, { ok: false, error: 'upstream_error' });
+    sendAiError(res, error, 'planner');
   }
 }
 

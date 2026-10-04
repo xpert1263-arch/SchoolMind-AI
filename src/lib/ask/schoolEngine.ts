@@ -3,16 +3,7 @@ import { classHasLessonsOn, lessonsOfClass, subjectById } from '@/data/queries';
 import { resolveText } from '@/data/types';
 import type { Assignment, ID, Locale, ScheduledLesson, SchoolClass, Weekday } from '@/data/types';
 import type { Translator } from '@/i18n';
-import {
-  addDays,
-  daysFromToday,
-  minutesOf,
-  nowMinutes,
-  todayISO,
-  toISODate,
-  weekdayOf,
-  weekdayOfISO,
-} from '@/lib/dates';
+import { addDays, daysFromToday, minutesOf, nowMinutes, toISODate, today, todayISO, weekdayOf, weekdayOfISO } from '@/lib/dates';
 import { dayLabel } from '@/lib/labels';
 import { ORDINAL_CUES, QUESTION_CUES, SCHOOL_TOPIC, SCHOOL_TOPIC_WORDS, TIME_CUES, WEEKDAY_CUES } from './lexicon';
 import { detectSubjectId } from './subjectMatch';
@@ -70,7 +61,7 @@ function detectWeekday(text: string): Weekday | undefined {
 
 /** Next date with this weekday, today included. */
 function nextDateForWeekday(weekday: Weekday): string {
-  const start = new Date();
+  const start = today();
   for (let i = 0; i < 7; i += 1) {
     const candidate = addDays(start, i);
     if (weekdayOf(candidate) === weekday) return toISODate(candidate);
@@ -108,8 +99,8 @@ function readIntent(question: string, focus: AskFocus): Intent {
   let dateISO: string | undefined;
   let hasDate = true;
   if (hasStem(text, TIME_CUES.today)) dateISO = todayISO();
-  else if (hasStem(text, TIME_CUES.tomorrow)) dateISO = toISODate(addDays(new Date(), 1));
-  else if (hasStem(text, TIME_CUES.yesterday)) dateISO = toISODate(addDays(new Date(), -1));
+  else if (hasStem(text, TIME_CUES.tomorrow)) dateISO = toISODate(addDays(today(), 1));
+  else if (hasStem(text, TIME_CUES.yesterday)) dateISO = toISODate(addDays(today(), -1));
   else {
     const weekday = detectWeekday(text);
     if (weekday) dateISO = nextDateForWeekday(weekday);
@@ -152,7 +143,7 @@ function findNextLesson(
 ): { entry: ScheduledLesson; dateISO: string } | undefined {
   const now = nowMinutes();
   for (let i = 0; i < days; i += 1) {
-    const date = addDays(new Date(), i);
+    const date = addDays(today(), i);
     const dayLessons = lessonsOfClass(classId, weekdayOf(date));
     for (const entry of dayLessons) {
       if (entry.subject.id !== subjectId) continue;

@@ -57,7 +57,12 @@ export const QUESTION_CUES = {
   deadline: ['muddat', 'qachongacha', 'срок', 'до какого', 'сдавать', 'сдать'],
 } as const;
 
-/** Cues that the answer depends on current, external information. */
+/**
+ * Cues that an answer can only come from outside SchoolMind: news, the
+ * open internet, a source to cite. These are unambiguous — none of them
+ * can mean something about the timetable — so they mark a question as
+ * needing live search on their own.
+ */
 export const WEB_CUES = {
   stems: [
     'yangilik',
@@ -69,19 +74,39 @@ export const WEB_CUES = {
     'ob-havo',
     "ob'havo",
     'obhavo',
-    "so'nggi",
-    'songgi',
     'eng yangi',
     'новост',
     'интернет',
     'источник',
     'погод',
-    'последн',
     'свеж',
     'курс валют',
   ],
   words: ['top', 'topib', 'toping', 'topsang', 'qidir', 'qidirib', 'найди', 'найти', 'поищи', 'ищи'],
 } as const;
+
+/**
+ * "As of right now" cues. These are genuinely ambiguous: "bugungi
+ * darslarim" is a timetable question and "bugungi yangiliklar" is not,
+ * so they only mean live information when nothing in the question
+ * points at a SchoolMind record.
+ */
+export const LIVE_CUES = [
+  'bugungi',
+  'hozir',
+  'hozirgi',
+  'ayni paytda',
+  'joriy',
+  "so'nggi",
+  'songgi',
+  'сегодня',
+  'сегодняшн',
+  'сейчас',
+  'последн',
+  'нынешн',
+  'актуальн',
+  'на данный момент',
+] as const;
 
 /** Cues that the student wants an explanation rather than a record. */
 export const EXPLAIN_CUES = [

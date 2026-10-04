@@ -1,3 +1,4 @@
+import { postJson } from '@/lib/ai/request';
 import type { AskCapabilities, AskErrorCode, AskRoute, WebSource } from './types';
 
 /* The only place the browser talks to the AskMySchool API. No key ever
@@ -21,6 +22,9 @@ export interface AskSuccess {
   route: AskRoute;
   routedByModel: boolean;
   degraded: 'web_unavailable' | 'no_results' | null;
+  /** True when the question needed live search and no grounded result
+   *  came back, so SchoolMind answered nothing rather than guessing. */
+  withheld: boolean;
 }
 
 export interface AskFailure {
@@ -34,6 +38,7 @@ const KNOWN_ERRORS: AskErrorCode[] = [
   'missing_api_key',
   'rate_limited',
   'network',
+  'timeout',
   'upstream_error',
   'empty_response',
   'question_too_long',
@@ -45,27 +50,15 @@ function toErrorCode(value: unknown): AskErrorCode {
 }
 
 export async function postAsk(request: AskRequest, signal?: AbortSignal): Promise<AskResponse> {
-  let response: Response;
-  try {
-    response = await fetch('/api/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-      signal,
-    });
-  } catch {
-    return { ok: false, error: 'network' };
-  }
+  const result = await postJson<Partial<AskSuccess> & { error?: unknown }>(
+    '/api/ask',
+    request,
+    { signal },
+  );
+  if (!result.ok) return { ok: false, error: result.error };
 
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ok: false, error: 'server_error' };
-  }
-
-  const body = payload as Partial<AskSuccess> & { error?: unknown };
-  if (!response.ok || body.ok !== true) {
+  const body = result.body;
+  if (result.status >= 400 || body.ok !== true) {
     return { ok: false, error: toErrorCode(body.error) };
   }
 
@@ -78,20 +71,30 @@ export async function postAsk(request: AskRequest, signal?: AbortSignal): Promis
     route: (body.route as AskRoute) ?? request.route,
     routedByModel: body.routedByModel === true,
     degraded: body.degraded ?? null,
+    withheld: body.withheld === true,
   };
 }
 
-/** What the server can actually do right now, for honest UI. */
+const NO_CAPABILITIES: AskCapabilities = {
+  aiConfigured: false,
+  visionConfigured: false,
+  webSearchEnabled: false,
+};
+
+/** What the server can actually do right now, for honest UI. A server
+ *  that cannot be reached is reported as capable of nothing rather
+ *  than assumed capable of everything. */
 export async function fetchCapabilities(): Promise<AskCapabilities> {
   try {
     const response = await fetch('/api/ask/status');
-    if (!response.ok) return { geminiConfigured: false, webSearchEnabled: false };
+    if (!response.ok) return NO_CAPABILITIES;
     const body = (await response.json()) as Partial<AskCapabilities>;
     return {
-      geminiConfigured: body.geminiConfigured === true,
+      aiConfigured: body.aiConfigured === true,
+      visionConfigured: body.visionConfigured === true,
       webSearchEnabled: body.webSearchEnabled === true,
     };
   } catch {
-    return { geminiConfigured: false, webSearchEnabled: false };
+    return NO_CAPABILITIES;
   }
 }

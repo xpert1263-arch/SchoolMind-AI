@@ -1,11 +1,6 @@
-import { hasGeminiKey } from './env.mjs';
-import {
-  AiUnavailableError,
-  generate,
-  generateStructured,
-  isGroundingAvailable,
-  isTemporarilyUnavailable,
-} from './gemini.mjs';
+import { hasAnyAiKey, hasGeminiKey } from './env.mjs';
+import { generate, generateStructured, isGroundingAvailable } from './ai/index.mjs';
+import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 
 /* ------------------------------------------------------------------
@@ -211,6 +206,9 @@ async function handleAnalyse(req, res) {
     send(res, 413, { ok: false, error: 'image_too_large' });
     return;
   }
+  /* Reading an image is a Gemini capability. There is no second
+     provider to fall back to here, and guessing at a photo nobody
+     looked at would be worse than saying so. */
   if (!hasGeminiKey) {
     send(res, 503, { ok: false, error: 'missing_api_key' });
     return;
@@ -224,26 +222,11 @@ async function handleAnalyse(req, res) {
         { text: 'Analyse this homework photo and respond using the required JSON schema.' },
       ],
       schema: ANALYSIS_SCHEMA,
+      vision: true,
     });
     send(res, 200, { ok: true, mode, result: sanitiseAnalysis(raw, mode) });
   } catch (error) {
-    if (error instanceof AiUnavailableError) {
-      send(res, 503, { ok: false, error: error.reason });
-      return;
-    }
-    if (isTemporarilyUnavailable(error)) {
-      logFailure(`all models unavailable (status ${error?.status})`, error);
-      send(res, 429, { ok: false, error: 'rate_limited' });
-      return;
-    }
-    const message = error instanceof Error ? error.message : '';
-    if (message === 'malformed_response' || message === 'empty_response') {
-      logFailure('vision analysis', error);
-      send(res, 502, { ok: false, error: message });
-      return;
-    }
-    logFailure('vision analysis', error);
-    send(res, 502, { ok: false, error: 'upstream_error' });
+    sendAiError(res, error, 'vision analysis');
   }
 }
 
@@ -265,7 +248,7 @@ async function handleFollowUp(req, res) {
     send(res, 400, { ok: false, error: 'question_too_long' });
     return;
   }
-  if (!hasGeminiKey) {
+  if (!hasAnyAiKey) {
     send(res, 503, { ok: false, error: 'missing_api_key' });
     return;
   }
@@ -319,17 +302,7 @@ async function handleFollowUp(req, res) {
       degraded,
     });
   } catch (error) {
-    if (error instanceof AiUnavailableError) {
-      send(res, 503, { ok: false, error: error.reason });
-      return;
-    }
-    if (isTemporarilyUnavailable(error)) {
-      logFailure(`all models unavailable (status ${error?.status})`, error);
-      send(res, 429, { ok: false, error: 'rate_limited' });
-      return;
-    }
-    logFailure('snap follow-up', error);
-    send(res, 502, { ok: false, error: 'upstream_error' });
+    sendAiError(res, error, 'snap follow-up');
   }
 }
 

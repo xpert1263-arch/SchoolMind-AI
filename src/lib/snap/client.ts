@@ -1,3 +1,4 @@
+import { postJson, VISION_TIMEOUT_MS } from '@/lib/ai/request';
 import type { WebSource } from '@/lib/ask/types';
 import type { HelpLevel, SnapAnalysis, SnapErrorCode } from './types';
 
@@ -9,6 +10,7 @@ const ERRORS: SnapErrorCode[] = [
   'missing_api_key',
   'rate_limited',
   'network',
+  'timeout',
   'upstream_error',
   'malformed_response',
   'empty_response',
@@ -33,27 +35,16 @@ export async function postAnalyse(
   body: { image: string; mimeType: string; locale: string; mode: HelpLevel },
   signal?: AbortSignal,
 ): Promise<AnalyseResponse> {
-  let response: Response;
-  try {
-    response = await fetch('/api/snap', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch {
-    return { ok: false, error: 'network' };
-  }
+  const posted = await postJson<{
+    ok?: boolean;
+    error?: unknown;
+    mode?: HelpLevel;
+    result?: SnapAnalysis;
+  }>('/api/snap', body, { signal, timeoutMs: VISION_TIMEOUT_MS });
+  if (!posted.ok) return { ok: false, error: posted.error };
 
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ok: false, error: 'server_error' };
-  }
-
-  const data = payload as { ok?: boolean; error?: unknown; mode?: HelpLevel; result?: SnapAnalysis };
-  if (!response.ok || data.ok !== true || !data.result) {
+  const data = posted.body;
+  if (posted.status >= 400 || data.ok !== true || !data.result) {
     return { ok: false, error: toErrorCode(data.error) };
   }
   return { ok: true, mode: data.mode ?? body.mode, result: data.result };
@@ -79,34 +70,18 @@ export async function postFollowUp(
   },
   signal?: AbortSignal,
 ): Promise<FollowUpResponse> {
-  let response: Response;
-  try {
-    response = await fetch('/api/snap/followup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch {
-    return { ok: false, error: 'network' };
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ok: false, error: 'server_error' };
-  }
-
-  const data = payload as {
+  const posted = await postJson<{
     ok?: boolean;
     error?: unknown;
     text?: string;
     sources?: WebSource[];
     usedWeb?: boolean;
     degraded?: 'web_unavailable' | 'no_results' | null;
-  };
-  if (!response.ok || data.ok !== true || typeof data.text !== 'string') {
+  }>('/api/snap/followup', body, { signal });
+  if (!posted.ok) return { ok: false, error: posted.error };
+
+  const data = posted.body;
+  if (posted.status >= 400 || data.ok !== true || typeof data.text !== 'string') {
     return { ok: false, error: toErrorCode(data.error) };
   }
   return {

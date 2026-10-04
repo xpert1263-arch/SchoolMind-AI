@@ -2,15 +2,7 @@ import { school } from '@/data/school';
 import { lessonsOfClass, subjectById } from '@/data/queries';
 import { resolveText } from '@/data/types';
 import type { Assignment, HomeworkItem, ID, Locale, SchoolClass } from '@/data/types';
-import {
-  addDays,
-  formatDate,
-  formatLongDate,
-  minutesOf,
-  nowMinutes,
-  todayISO,
-  weekdayOf,
-} from '@/lib/dates';
+import { addDays, formatDate, formatLongDate, minutesOf, nowMinutes, today, todayISO, weekdayOf } from '@/lib/dates';
 import type { Intensity, PlannerContext, PlannerTask, Priority } from './types';
 
 /* ------------------------------------------------------------------
@@ -73,7 +65,7 @@ export function buildPlannerTasks(items: HomeworkItem[], locale: Locale): Planne
  * never before the last lesson of the day has finished.
  */
 export function studyStartTime(classId: ID): string {
-  const lessons = lessonsOfClass(classId, weekdayOf(new Date()));
+  const lessons = lessonsOfClass(classId, weekdayOf(today()));
   const lastEnd = lessons.length > 0 ? minutesOf(lessons[lessons.length - 1].slot.end) : 0;
   /* Half an hour to get home and eat before anything starts. */
   const earliest = lastEnd > 0 ? lastEnd + 30 : 0;
@@ -84,7 +76,7 @@ export function studyStartTime(classId: ID): string {
 }
 
 function lessonLines(classId: ID, dayOffset: number, locale: Locale): string[] {
-  const date = addDays(new Date(), dayOffset);
+  const date = addDays(today(), dayOffset);
   return lessonsOfClass(classId, weekdayOf(date)).map(
     (entry) =>
       `${entry.slot.start} ${resolveText(entry.subject.name, locale)} (${entry.lesson.room})`,

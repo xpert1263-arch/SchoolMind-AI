@@ -10,6 +10,8 @@ import {
   Presentation,
   ScanLine,
   Sparkles,
+  Target,
+  Users2,
   Sun,
   Users,
   type LucideIcon,
@@ -51,8 +53,13 @@ export const studentNav: NavGroup[] = [
       { to: '/student/ask', labelKey: 'nav.askSchool', icon: MessagesSquare },
       { to: '/student/snap', labelKey: 'nav.snapHomework', icon: ScanLine },
       { to: '/student/planner', labelKey: 'nav.aiPlanner', icon: CalendarCheck },
+      { to: '/student/quiz', labelKey: 'nav.quiz', icon: Target },
       { to: '/student/tutor', labelKey: 'nav.aiTutor', icon: GraduationCap },
     ],
+  },
+  {
+    labelKey: 'nav.groupFamily',
+    items: [{ to: '/student/parents', labelKey: 'nav.parents', icon: Users2 }],
   },
 ];
 
@@ -69,8 +76,8 @@ export const teacherNav: NavGroup[] = [
   {
     labelKey: 'nav.groupAi',
     items: [
-      { to: '/teacher/pulse', labelKey: 'nav.classPulse', icon: LineChart, futureVersion: 'v1.7' },
-      { to: '/teacher/ai', labelKey: 'nav.teacherAi', icon: Sparkles, futureVersion: 'v1.6' },
+      { to: '/teacher/ai', labelKey: 'nav.teacherAi', icon: Sparkles },
+      { to: '/teacher/pulse', labelKey: 'nav.classPulse', icon: LineChart },
     ],
   },
 ];

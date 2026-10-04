@@ -32,10 +32,13 @@ import type {
   Teacher,
 } from '@/data/types';
 import {
+  addDays,
   daysFromToday,
   minutesOf,
   nextTeachingDayISO,
   nowMinutes,
+  today,
+  toISODate,
   todayISO,
   weekdayOf,
   weekdayOfISO,
@@ -156,18 +159,14 @@ function buildTimeline(dayLessons: ScheduledLesson[], isToday: boolean): DayTime
 }
 
 function isoTomorrow(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const y = d.getFullYear();
-  const m = `${d.getMonth() + 1}`.padStart(2, '0');
-  const day = `${d.getDate()}`.padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  /* Counted from the demo clock, like every other date on screen. */
+  return toISODate(addDays(today(), 1));
 }
 
 export function useStudentToday(): DayTimeline {
   const { schoolClass } = useCurrentStudent();
   return useMemo(() => {
-    const weekday = weekdayOf(new Date());
+    const weekday = weekdayOf(today());
     return buildTimeline(lessonsOfClass(schoolClass.id, weekday), true);
   }, [schoolClass.id]);
 }
@@ -231,12 +230,70 @@ export function usePersonalTasks(): PersonalTaskItem[] {
   );
 }
 
+/** Seeded notices plus anything the running demo raised — today, a
+ *  ClassPulse going live. Newest first, pinned items ahead of the
+ *  rest, exactly as the seeded list is already ordered. */
+function useAllAnnouncements(): Announcement[] {
+  const { state } = useApp();
+  return useMemo(() => {
+    if (state.createdAnnouncements.length === 0) return announcements;
+    return [...state.createdAnnouncements, ...announcements].sort((a, b) => {
+      if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+      return b.date.localeCompare(a.date);
+    });
+  }, [state.createdAnnouncements]);
+}
+
 export function useAnnouncements(limit?: number): Announcement[] {
   const { schoolClass } = useCurrentStudent();
+  const all = useAllAnnouncements();
   return useMemo(() => {
-    const visible = announcements.filter((a) => !a.classId || a.classId === schoolClass.id);
+    const visible = all.filter((a) => !a.classId || a.classId === schoolClass.id);
     return typeof limit === 'number' ? visible.slice(0, limit) : visible;
-  }, [schoolClass.id, limit]);
+  }, [all, schoolClass.id, limit]);
+}
+
+/* ---- notifications --------------------------------------------------
+   What the bell shows, and how many of them this person has not opened
+   yet. Audience and class are both respected, so a teacher is not shown
+   a note addressed to one class's students. */
+
+/** How many notifications the panel lists, and therefore how many one
+ *  visit can mark as read. */
+const NOTIFICATION_LIMIT = 6;
+
+export interface Notifications {
+  items: Announcement[];
+  unreadIds: ID[];
+}
+
+export function useNotifications(): Notifications {
+  const session = useSession();
+  const { user } = useApp();
+  const { schoolClass } = useCurrentStudent();
+  const { taughtClasses } = useCurrentTeacher();
+  const all = useAllAnnouncements();
+
+  const role = session?.role ?? 'student';
+  const classKey =
+    role === 'teacher' ? taughtClasses.map((c) => c.id).join(',') : schoolClass.id;
+
+  return useMemo(() => {
+    const mine = new Set(classKey ? classKey.split(',') : []);
+    const items = all
+      .filter((a) => {
+        if (a.audience !== 'all' && a.audience !== `${role}s`) return false;
+        return !a.classId || mine.has(a.classId);
+      })
+      .slice(0, NOTIFICATION_LIMIT);
+
+    return {
+      items,
+      unreadIds: items
+        .filter((a) => !user.readAnnouncementIds.includes(a.id))
+        .map((a) => a.id),
+    };
+  }, [all, classKey, role, user.readAnnouncementIds]);
 }
 
 /* ---- teacher -------------------------------------------------------- */
@@ -244,7 +301,7 @@ export function useAnnouncements(limit?: number): Announcement[] {
 export function useTeacherToday(): DayTimeline {
   const { teacher } = useCurrentTeacher();
   return useMemo(() => {
-    const weekday = weekdayOf(new Date());
+    const weekday = weekdayOf(today());
     return buildTimeline(lessonsOfTeacher(teacher.id, weekday), true);
   }, [teacher.id]);
 }
@@ -353,18 +410,14 @@ export function useAssignmentsForStudent(student: Student): HomeworkItem[] {
 export function useUpcomingClassLessons(classId: ID, days = 3): Array<{ date: string; lessons: ScheduledLesson[] }> {
   return useMemo(() => {
     const out: Array<{ date: string; lessons: ScheduledLesson[] }> = [];
-    const start = new Date();
+    const start = today();
     for (let i = 0; out.length < days && i < 10; i += 1) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
+      const d = addDays(start, i);
       const weekday = weekdayOf(d);
       if (weekday === 7) continue;
       const dayLessons = lessonsOfClass(classId, weekday);
       if (dayLessons.length === 0) continue;
-      const y = d.getFullYear();
-      const m = `${d.getMonth() + 1}`.padStart(2, '0');
-      const day = `${d.getDate()}`.padStart(2, '0');
-      out.push({ date: `${y}-${m}-${day}`, lessons: dayLessons });
+      out.push({ date: toISODate(d), lessons: dayLessons });
     }
     return out;
   }, [classId, days]);

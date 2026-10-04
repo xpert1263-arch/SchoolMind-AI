@@ -32,6 +32,7 @@ const ERROR_TEXT: Record<AskErrorCode, Parameters<ReturnType<typeof useI18n>['t'
   missing_api_key: 'ask.error.noKey',
   rate_limited: 'ask.error.rateLimited',
   network: 'ask.error.network',
+  timeout: 'ask.error.timeout',
   upstream_error: 'ask.error.upstream',
   empty_response: 'ask.error.upstream',
   question_too_long: 'ask.error.tooLong',
@@ -194,6 +195,33 @@ export function useAsk(): UseAsk {
             sources: schoolBlocks.length > 0 ? ['school'] : [],
             blocks: [...schoolBlocks, { kind: 'warning', textKey: ERROR_TEXT[response.error] }],
             actions: schoolActions,
+          });
+          setBusy(false);
+          return;
+        }
+
+        /* Live question, nothing grounded to stand on: show the school
+           half if there is one, say plainly that the internet could not
+           be checked, and offer to try again. No AI badge, because no
+           AI answer was written. */
+        if (response.withheld) {
+          patch(id, {
+            status: 'done',
+            route: response.route,
+            sources: schoolBlocks.length > 0 ? ['school'] : [],
+            blocks: [
+              ...schoolBlocks,
+              {
+                kind: 'warning',
+                textKey:
+                  response.degraded === 'no_results'
+                    ? 'ask.warn.liveNoResults'
+                    : 'ask.warn.liveUnavailable',
+              },
+            ],
+            actions: schoolActions,
+            degraded: response.degraded ?? undefined,
+            withheld: true,
           });
           setBusy(false);
           return;

@@ -1,5 +1,6 @@
 import {
   EXPLAIN_CUES,
+  LIVE_CUES,
   QUESTION_CUES,
   SCHOOL_TOPIC,
   SCHOOL_TOPIC_WORDS,
@@ -87,7 +88,13 @@ export function classify(question: string, options: ClassifyOptions = {}): Class
     weekday ||
     (timeCue && namedSubject);
   const subject = namedSubject || referential;
-  const web = hasStem(text, WEB_CUES.stems) || hasWord(text, WEB_CUES.words);
+  /* Two ways a question needs the live internet: it names one
+     outright, or it asks about "right now" and nothing in it refers to
+     a SchoolMind record. The second test is what keeps "bugungi
+     darslarim" a timetable question and makes "bugungi yangiliklar" a
+     search. */
+  const explicitWeb = hasStem(text, WEB_CUES.stems) || hasWord(text, WEB_CUES.words);
+  const web = explicitWeb || (hasStem(text, LIVE_CUES) && !schoolTopic);
   const explain = hasStem(text, EXPLAIN_CUES);
   const followUp = looksLikeFollowUp(text);
 

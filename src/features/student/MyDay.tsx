@@ -19,6 +19,7 @@ import { HomeworkDetail } from '@/components/school/HomeworkDetail';
 import { HomeworkRow } from '@/components/school/HomeworkRow';
 import { LessonRow } from '@/components/school/LessonRow';
 
+import { PulseCard } from './pulse/PulseCard';
 /** A focused view of one day — lessons first, then everything after school. */
 export function MyDay() {
   const { t, text, locale } = useI18n();
@@ -43,6 +44,8 @@ export function MyDay() {
         title={t('student.myDay.title')}
         subtitle={t('student.myDay.subtitle')}
       />
+
+      <PulseCard />
 
       <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Section title={t('student.myDay.lessonsHeading')}>

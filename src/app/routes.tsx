@@ -1,5 +1,4 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
-import { LineChart, Sparkles } from 'lucide-react';
 import { AppShell } from './AppShell';
 import { RequireAuth, RequireRole, SessionRedirect } from './guards';
 import { Login } from '@/features/auth/Login';
@@ -11,11 +10,14 @@ import { AskSchool } from '@/features/student/ask/AskSchool';
 import { SnapHomework } from '@/features/student/snap/SnapHomework';
 import { AiPlanner } from '@/features/student/planner/AiPlanner';
 import { AiTutor } from '@/features/student/tutor/AiTutor';
+import { Quiz } from '@/features/student/quiz/Quiz';
+import { Parents } from '@/features/student/parents/Parents';
 import { TeacherOverview } from '@/features/teacher/TeacherOverview';
 import { Classes } from '@/features/teacher/Classes';
 import { Assignments } from '@/features/teacher/Assignments';
 import { Students } from '@/features/teacher/Students';
-import { FuturePage } from '@/features/shared/FuturePage';
+import { TeacherAi } from '@/features/teacher/ai/TeacherAi';
+import { ClassPulse } from '@/features/teacher/pulse/ClassPulse';
 import { NotFound } from '@/features/shared/NotFound';
 
 /* ------------------------------------------------------------------
@@ -50,7 +52,9 @@ export const router = createBrowserRouter([
               { path: 'student/ask', element: <AskSchool /> },
               { path: 'student/snap', element: <SnapHomework /> },
               { path: 'student/planner', element: <AiPlanner /> },
+              { path: 'student/quiz', element: <Quiz /> },
               { path: 'student/tutor', element: <AiTutor /> },
+              { path: 'student/parents', element: <Parents /> },
             ],
           },
 
@@ -63,34 +67,8 @@ export const router = createBrowserRouter([
               { path: 'teacher/classes', element: <Classes /> },
               { path: 'teacher/assignments', element: <Assignments /> },
               { path: 'teacher/students', element: <Students /> },
-              {
-                path: 'teacher/pulse',
-                element: (
-                  <FuturePage
-                    titleKey="future.classPulseTitle"
-                    bodyKey="future.classPulseBody"
-                    version="v1.7"
-                    icon={<LineChart size={22} aria-hidden />}
-                    backTo="/teacher/overview"
-                    backLabelKey="nav.overview"
-                    pointKeys={['future.classPulseP1', 'future.classPulseP2', 'future.classPulseP3']}
-                  />
-                ),
-              },
-              {
-                path: 'teacher/ai',
-                element: (
-                  <FuturePage
-                    titleKey="future.teacherAiTitle"
-                    bodyKey="future.teacherAiBody"
-                    version="v1.6"
-                    icon={<Sparkles size={22} aria-hidden />}
-                    backTo="/teacher/overview"
-                    backLabelKey="nav.overview"
-                    pointKeys={['future.teacherAiP1', 'future.teacherAiP2', 'future.teacherAiP3']}
-                  />
-                ),
-              },
+              { path: 'teacher/pulse', element: <ClassPulse /> },
+              { path: 'teacher/ai', element: <TeacherAi /> },
             ],
           },
 

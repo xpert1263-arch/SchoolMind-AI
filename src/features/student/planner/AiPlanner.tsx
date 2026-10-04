@@ -35,6 +35,7 @@ const ERROR_KEY: Record<PlannerErrorCode, TranslationKey> = {
   missing_api_key: 'planner.noKeyBody',
   rate_limited: 'planner.errRateLimited',
   network: 'planner.errNetwork',
+  timeout: 'planner.errTimeout',
   upstream_error: 'planner.errUpstream',
   malformed_response: 'planner.errUpstream',
   empty_response: 'planner.errUpstream',
@@ -106,7 +107,7 @@ export function AiPlanner() {
         </p>
       </header>
 
-      {planner.capabilities && !planner.capabilities.geminiConfigured ? (
+      {planner.capabilities && !planner.capabilities.aiConfigured ? (
         <div className="flex items-start gap-2.5 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-3">
           <Info size={15} aria-hidden className="mt-0.5 shrink-0 text-warn-text" />
           <div className="min-w-0">

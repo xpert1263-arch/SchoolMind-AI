@@ -1,10 +1,13 @@
 import { askMiddleware } from './askHandler.mjs';
-import { describeConfig } from './env.mjs';
+import { describeConfigForLog, hasTelegramToken } from './env.mjs';
+import { describeProviders } from './ai/index.mjs';
+import { startTelegramBridge } from './telegram.mjs';
 
 /**
- * Mounts the AskMySchool API inside Vite's dev and preview servers, so
- * the Gemini key stays in the Node process and never reaches the
- * browser bundle. Nothing in this file is importable from src/.
+ * Mounts the SchoolMind API inside Vite's dev and preview servers, so
+ * every secret — Gemini, Groq, the Telegram bot token — stays in the
+ * Node process and never reaches the browser bundle. Nothing in this
+ * file, or in anything it imports, is importable from src/.
  */
 export function askMySchoolApi() {
   let announced = false;
@@ -12,20 +15,34 @@ export function askMySchoolApi() {
   const announce = () => {
     if (announced) return;
     announced = true;
-    const { geminiConfigured, webSearchEnabled, model } = describeConfig();
-    if (!geminiConfigured) {
+
+    const { aiConfigured, webSearchEnabled, geminiModel } = describeConfigForLog();
+
+    void describeProviders().then((providers) => {
+      /* Model names are fine here: this is a server log. */
+      const model = geminiModel ? ` [${geminiModel}]` : '';
+      console.info(`[schoolmind-ai] providers: ${providers}${model}`);
+      if (!aiConfigured) {
+        console.info(
+          '[schoolmind-ai] no AI provider configured — school-data answers and SchoolMind fallbacks still work. See .env.example.',
+        );
+      }
+      console.info(`[schoolmind-ai] grounded web search ${webSearchEnabled ? 'on' : 'off'}.`);
+    });
+
+    if (!hasTelegramToken) {
       console.info(
-        '[askmyschool] GEMINI_API_KEY not set — school-data answers work, AI and web search are disabled. See .env.example.',
+        '[schoolmind-telegram] TELEGRAM_BOT_TOKEN not set — Parent Connect stores records but cannot link or deliver. See .env.example.',
       );
       return;
     }
-    console.info(
-      `[askmyschool] Gemini ready (model ${model}), grounded web search ${webSearchEnabled ? 'on' : 'off'}.`,
-    );
+    /* One bridge per process, however many times Vite re-evaluates
+       this module during hot reload. */
+    void startTelegramBridge();
   };
 
   return {
-    name: 'schoolmind:askmyschool-api',
+    name: 'schoolmind:api',
     configureServer(server) {
       server.middlewares.use(askMiddleware);
       announce();

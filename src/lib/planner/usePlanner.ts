@@ -145,6 +145,9 @@ export function usePlanner(): UsePlanner {
   );
 
   const generate = useCallback(() => {
+    /* Guard the action itself, not just the button: Enter on a focused
+       control reaches here without passing a disabled check. */
+    if (status === 'generating' || status === 'adjusting') return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -172,13 +175,14 @@ export function usePlanner(): UsePlanner {
       setPlan(toStudyPlan(response.plan, ctx));
       setStatus('ready');
     })();
-  }, [context, locale, setPlan, t, toStudyPlan]);
+  }, [context, locale, setPlan, status, t, toStudyPlan]);
 
   const adjust = useCallback(
     (raw: string) => {
       const request = raw.trim();
       const current = user.plan;
       if (!request || !current) return;
+      if (status === 'generating' || status === 'adjusting') return;
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -226,7 +230,7 @@ export function usePlanner(): UsePlanner {
         setStatus('ready');
       })();
     },
-    [context, locale, setPlan, user.plan, toStudyPlan],
+    [context, locale, setPlan, status, user.plan, toStudyPlan],
   );
 
   const discard = useCallback(() => {

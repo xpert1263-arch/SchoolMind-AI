@@ -7,7 +7,7 @@ import { fullName, initialsOf } from '@/data/queries';
 import { locales, localeLabels } from '@/i18n';
 import { useI18n } from '@/i18n/useI18n';
 import { useApp } from '@/state/store';
-import { useAnnouncements, useCurrentStudent, useCurrentTeacher } from '@/state/selectors';
+import { useCurrentStudent, useCurrentTeacher, useNotifications } from '@/state/selectors';
 import { Avatar } from '@/components/ui/Display';
 import { Button } from '@/components/ui/Button';
 import { Popover } from '@/components/ui/Popover';
@@ -162,11 +162,15 @@ function LocaleToggle({ locale, onChange }: { locale: Locale; onChange: (l: Loca
 
 function NotificationsButton() {
   const { t, text, locale } = useI18n();
-  const items = useAnnouncements(3);
+  const { markAnnouncementsRead } = useApp();
+  const { items, unreadIds } = useNotifications();
 
   return (
     <Popover
       label={t('settings.notifications')}
+      /* Opening the panel is reading it: exactly the notices now on
+         screen are marked, so a later one brings the dot back. */
+      onOpen={() => markAnnouncementsRead(items.map((item) => item.id))}
       trigger={({ toggle, open }) => (
         <Button
           variant="ghost"
@@ -177,8 +181,11 @@ function NotificationsButton() {
           className="relative"
         >
           <Bell size={17} aria-hidden />
-          {items.length > 0 ? (
-            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-canvas" />
+          {unreadIds.length > 0 ? (
+            <span
+              className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-canvas"
+              aria-label={t('settings.unread', { n: unreadIds.length })}
+            />
           ) : null}
         </Button>
       )}

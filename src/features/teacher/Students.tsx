@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Panel, Rows, Section } from '@/components/ui/Surface';
 import { TextInput } from '@/components/ui/Field';
 import { Chip, StatusPill, SubjectChip } from '@/components/ui/Status';
+import { ParentContact } from './parents/ParentContact';
 
 export function Students() {
   const { t } = useI18n();
@@ -189,6 +190,10 @@ function StudentDrawer({ student, onClose }: { student: Student | null; onClose:
             </Panel>
           </Section>
         ) : null}
+
+        {/* The family, and the one place a teacher can contact them.
+            Authorised server-side against this teacher's classes. */}
+        <ParentContact student={student} />
 
         <p className="text-[12px] text-ink-subtle">{t('teacher.students.note')}</p>
       </div>

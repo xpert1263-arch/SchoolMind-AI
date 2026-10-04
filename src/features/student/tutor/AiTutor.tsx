@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2,
@@ -46,6 +47,7 @@ const ERROR_KEY: Record<TutorErrorCode, TranslationKey> = {
   missing_api_key: 'tutor.errNoKey',
   rate_limited: 'tutor.errRateLimited',
   network: 'tutor.errNetwork',
+  timeout: 'tutor.errTimeout',
   upstream_error: 'tutor.errUpstream',
   malformed_response: 'tutor.errUpstream',
   empty_response: 'tutor.errUpstream',
@@ -107,6 +109,7 @@ const TOPIC_SUGGESTIONS: Record<string, string[]> = {
 export function AiTutor() {
   const { t } = useI18n();
   const tutor = useTutor();
+  const location = useLocation();
   const [subjectId, setSubjectId] = useState('');
   const [topic, setTopic] = useState('');
   const [mode, setMode] = useState<TutorMode>('explain');
@@ -119,6 +122,21 @@ export function AiTutor() {
   useEffect(() => {
     if (!subjectId && tutor.subjects.length > 0) setSubjectId(tutor.subjects[0].id);
   }, [subjectId, tutor.subjects]);
+
+  /* Arriving from a quiz mistake: the subject and topic are filled in
+     and nothing else happens. Starting the lesson stays the student's
+     decision, so navigating here never spends a request. */
+  const handover = location.state as { subjectId?: string; topic?: string } | null;
+  const handoverKey = `${handover?.subjectId ?? ''}|${handover?.topic ?? ''}`;
+  const appliedRef = useRef('');
+  useEffect(() => {
+    if (!handover?.topic || appliedRef.current === handoverKey) return;
+    appliedRef.current = handoverKey;
+    if (handover.subjectId && tutor.subjects.some((s) => s.id === handover.subjectId)) {
+      setSubjectId(handover.subjectId);
+    }
+    setTopic(handover.topic);
+  }, [handover, handoverKey, tutor.subjects]);
 
   useEffect(() => {
     if (session?.turns.length) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -164,7 +182,7 @@ export function AiTutor() {
         </p>
       </header>
 
-      {tutor.capabilities && !tutor.capabilities.geminiConfigured ? (
+      {tutor.capabilities && !tutor.capabilities.aiConfigured ? (
         <div className="flex items-start gap-2.5 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-3">
           <Info size={15} aria-hidden className="mt-0.5 shrink-0 text-warn-text" />
           <div className="min-w-0">

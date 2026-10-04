@@ -1,3 +1,4 @@
+import { postJson } from '@/lib/ai/request';
 import type { PlanItem, PlannerContext, PlannerErrorCode, StudyPlan } from './types';
 
 /* The browser's only channel to the planner endpoints. The key stays
@@ -8,6 +9,7 @@ const ERRORS: PlannerErrorCode[] = [
   'missing_api_key',
   'rate_limited',
   'network',
+  'timeout',
   'upstream_error',
   'malformed_response',
   'empty_response',
@@ -38,27 +40,13 @@ export type PlanResponse =
   | { ok: false; error: PlannerErrorCode };
 
 async function post(url: string, body: unknown, signal?: AbortSignal): Promise<PlanResponse> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch {
-    return { ok: false, error: 'network' };
-  }
+  const result = await postJson<{ ok?: boolean; error?: unknown; plan?: PlanPayload }>(url, body, {
+    signal,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
 
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ok: false, error: 'server_error' };
-  }
-
-  const data = payload as { ok?: boolean; error?: unknown; plan?: PlanPayload };
-  if (!response.ok || data.ok !== true || !data.plan || !Array.isArray(data.plan.items)) {
+  const data = result.body;
+  if (result.status >= 400 || data.ok !== true || !data.plan || !Array.isArray(data.plan.items)) {
     return { ok: false, error: toErrorCode(data.error) };
   }
   return { ok: true, plan: data.plan };

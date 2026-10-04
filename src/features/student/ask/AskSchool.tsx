@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, CornerDownLeft, Globe, Info, Loader2, Search, Sparkles, X } from 'lucide-react';
+import {
+  ArrowRight,
+  CornerDownLeft,
+  Globe,
+  Info,
+  Loader2,
+  RotateCcw,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import type { TranslationKey } from '@/i18n';
 import { useI18n } from '@/i18n/useI18n';
 import { cn } from '@/lib/cn';
@@ -129,7 +139,7 @@ export function AskSchool() {
       </form>
 
       {/* ---- capability notice --------------------------------------- */}
-      {capabilities && !capabilities.geminiConfigured ? (
+      {capabilities && !capabilities.aiConfigured ? (
         <div className="flex items-start gap-2.5 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-3">
           <Info size={15} aria-hidden className="mt-0.5 shrink-0 text-warn-text" />
           <div className="min-w-0">
@@ -145,7 +155,7 @@ export function AskSchool() {
       {hasTurns ? (
         <div className="flex flex-col gap-8">
           {turns.map((turn) => (
-            <TurnView key={turn.id} turn={turn} />
+            <TurnView key={turn.id} turn={turn} onRetry={() => ask(turn.question)} busy={busy} />
           ))}
           <div ref={feedEndRef} />
         </div>
@@ -196,7 +206,15 @@ function StartState({ onPick }: { onPick: (q: string) => void }) {
   );
 }
 
-function TurnView({ turn }: { turn: AskTurn }) {
+function TurnView({
+  turn,
+  onRetry,
+  busy,
+}: {
+  turn: AskTurn;
+  onRetry: () => void;
+  busy: boolean;
+}) {
   const { t } = useI18n();
   const pending = turn.status === 'thinking' || turn.status === 'searching';
 
@@ -239,6 +257,22 @@ function TurnView({ turn }: { turn: AskTurn }) {
               {turn.blocks.map((block, index) => (
                 <AnswerBlockView key={index} block={block} />
               ))}
+
+              {/* Live search could not be checked, so nothing was
+                  answered. Offer the one thing that might help. */}
+              {turn.withheld ? (
+                <div className="pt-0.5">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onRetry}
+                    disabled={busy}
+                    iconLeft={<RotateCcw size={13} aria-hidden />}
+                  >
+                    {t('ask.retry')}
+                  </Button>
+                </div>
+              ) : null}
 
               {turn.actions.length > 0 ? (
                 <div className="flex flex-wrap gap-2 pt-0.5">

@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type {
   ActivityEvent,
+  Announcement,
   AppMode,
   Assignment,
   AssignmentKind,
@@ -20,6 +21,9 @@ import { DEMO_STUDENT_ID, DEMO_TEACHER_ID, seedCompletedAssignmentIds } from '@/
 import { useAuth } from '@/auth/AuthProvider';
 import type { StudyPlan } from '@/lib/planner/types';
 import type { TutorSession } from '@/lib/tutor/types';
+import type { QuizHistoryEntry, QuizSession } from '@/lib/quiz/types';
+import type { TeacherAiState } from '@/lib/teacherAi/types';
+import type { ClassPulse, ClassPulseResponse, PulseStatus } from '@/lib/pulse/types';
 import { todayISO } from '@/lib/dates';
 import { migrateStoredState, readStoredState, STATE_VERSION, writeStoredState } from './storage';
 
@@ -52,6 +56,18 @@ export interface UserState {
   completedPlanItemIds: ID[];
   /** The AI Tutor lesson in progress, if any. */
   tutor: TutorSession | null;
+  /** Announcement ids this person has already seen in their
+   *  notification panel. Read state is per person: one student
+   *  reading theirs says nothing about anybody else's. */
+  readAnnouncementIds: ID[];
+  /** The quiz being taken, if any. */
+  quiz: QuizSession | null;
+  /** Finished quizzes, newest first. Facts about what was practised,
+   *  never a claim about the student. */
+  quizHistory: QuizHistoryEntry[];
+  /** A teacher's last Teacher AI result and conversation. Keyed under
+   *  the teacher, so two teachers never see each other's drafts. */
+  teacherAi: TeacherAiState | null;
 }
 
 export const EMPTY_USER: UserState = {
@@ -60,6 +76,10 @@ export const EMPTY_USER: UserState = {
   plan: null,
   completedPlanItemIds: [],
   tutor: null,
+  readAnnouncementIds: [],
+  quiz: null,
+  quizHistory: [],
+  teacherAi: null,
 };
 
 export interface AppState {
@@ -69,6 +89,15 @@ export interface AppState {
   locale: Locale;
   /** Assignments created by a teacher inside the running demo. */
   createdAssignments: Assignment[];
+  /** Notices raised by the running demo — today, only ClassPulse.
+   *  Shared like assignments, because a notification one person
+   *  creates is one everybody eligible can see. */
+  createdAnnouncements: Announcement[];
+  /** ClassPulse questions and the answers to them. Shared school
+   *  data: the teacher writes one, every pupil in that class answers
+   *  the same record, and the teacher reads the same answers back. */
+  pulses: ClassPulse[];
+  pulseResponses: ClassPulseResponse[];
   activity: ActivityEvent[];
   /** Per-person state, keyed by student or teacher id. */
   users: Record<ID, UserState>;
@@ -89,6 +118,9 @@ const initialState: AppState = {
   theme: 'light',
   locale: 'uz',
   createdAssignments: [],
+  createdAnnouncements: [],
+  pulses: [],
+  pulseResponses: [],
   activity: [],
   /* The one student the demo opens on starts with a little history,
      so the first screen is not uniformly empty. */
@@ -108,9 +140,26 @@ type Action =
   | { type: 'clearPlan'; userId: ID }
   | { type: 'togglePlanItem'; id: ID; userId: ID }
   | { type: 'setTutor'; session: TutorSession | null; userId: ID }
+  | { type: 'markAnnouncementsRead'; ids: ID[]; userId: ID }
+  | { type: 'setQuiz'; quiz: QuizSession | null; userId: ID }
+  | { type: 'recordQuiz'; entry: QuizHistoryEntry; userId: ID }
+  | {
+      type: 'setTeacherAi';
+      /* Either the next state or a function of the current one: a chat
+         turn is patched in place while a request is in flight, and the
+         reducer is the only place that knows the current value. */
+      update: TeacherAiState | ((current: TeacherAiState | null) => TeacherAiState);
+      userId: ID;
+    }
+  | { type: 'createPulse'; pulse: ClassPulse }
+  | { type: 'updatePulse'; id: ID; change: Partial<ClassPulse> }
+  | { type: 'setPulseStatus'; id: ID; status: PulseStatus; announcement?: Announcement }
+  | { type: 'answerPulse'; response: ClassPulseResponse }
   | { type: 'reset' };
 
 const ACTIVITY_LIMIT = 12;
+/** Enough history to show a trend, not enough to grow without end. */
+const QUIZ_HISTORY_LIMIT = 20;
 
 function pushActivity(state: AppState, event: ActivityEvent): ActivityEvent[] {
   return [event, ...state.activity].slice(0, ACTIVITY_LIMIT);
@@ -205,6 +254,99 @@ function reducer(state: AppState, action: Action): AppState {
     case 'setTutor':
       return patchUser(state, action.userId, { tutor: action.session });
 
+    case 'markAnnouncementsRead': {
+      const current = userStateOf(state, action.userId);
+      const unseen = action.ids.filter((id) => !current.readAnnouncementIds.includes(id));
+      /* Nothing new to record — return the same object so opening the
+         panel twice does not re-render or re-persist. */
+      if (unseen.length === 0) return state;
+      return patchUser(state, action.userId, {
+        readAnnouncementIds: [...current.readAnnouncementIds, ...unseen],
+      });
+    }
+
+    case 'setQuiz':
+      return patchUser(state, action.userId, { quiz: action.quiz });
+
+    case 'recordQuiz': {
+      const current = userStateOf(state, action.userId);
+      /* Replaying the same finished quiz must not log it twice. */
+      if (current.quizHistory.some((entry) => entry.id === action.entry.id)) return state;
+      return patchUser(state, action.userId, {
+        quizHistory: [action.entry, ...current.quizHistory].slice(0, QUIZ_HISTORY_LIMIT),
+      });
+    }
+
+    case 'setTeacherAi': {
+      const current = userStateOf(state, action.userId);
+      const next =
+        typeof action.update === 'function' ? action.update(current.teacherAi) : action.update;
+      return patchUser(state, action.userId, { teacherAi: next });
+    }
+
+    case 'createPulse':
+      return { ...state, pulses: [action.pulse, ...state.pulses] };
+
+    case 'updatePulse':
+      return {
+        ...state,
+        pulses: state.pulses.map((pulse) =>
+          pulse.id === action.id ? { ...pulse, ...action.change } : pulse,
+        ),
+      };
+
+    case 'setPulseStatus': {
+      const now = new Date().toISOString();
+      const pulses = state.pulses.map((pulse) =>
+        pulse.id === action.id
+          ? {
+              ...pulse,
+              status: action.status,
+              activatedAt: action.status === 'active' ? now : pulse.activatedAt,
+              closedAt: action.status === 'closed' ? now : pulse.closedAt,
+            }
+          : pulse,
+      );
+
+      /* Activating raises exactly one notice, and only the first
+         time: the id is derived from the pulse, so a repeated
+         activation finds it already there instead of adding a
+         second one. */
+      const announcement = action.announcement;
+      const already =
+        announcement && state.createdAnnouncements.some((a) => a.id === announcement.id);
+
+      return {
+        ...state,
+        pulses,
+        createdAnnouncements:
+          announcement && !already
+            ? [announcement, ...state.createdAnnouncements]
+            : state.createdAnnouncements,
+      };
+    }
+
+    case 'answerPulse': {
+      /* One answer per pupil per pulse. A second submission edits the
+         first rather than stacking up beside it. */
+      const existing = state.pulseResponses.find(
+        (entry) =>
+          entry.pulseId === action.response.pulseId &&
+          entry.studentId === action.response.studentId,
+      );
+      if (existing) {
+        return {
+          ...state,
+          pulseResponses: state.pulseResponses.map((entry) =>
+            entry.id === existing.id
+              ? { ...entry, answer: action.response.answer, updatedAt: new Date().toISOString() }
+              : entry,
+          ),
+        };
+      }
+      return { ...state, pulseResponses: [...state.pulseResponses, action.response] };
+    }
+
     case 'reset':
       return { ...initialState };
 
@@ -231,6 +373,18 @@ function readUser(raw: unknown): UserState {
       ? value.completedPlanItemIds
       : [],
     tutor: value.tutor && typeof value.tutor === 'object' ? value.tutor : null,
+    readAnnouncementIds: Array.isArray(value.readAnnouncementIds)
+      ? value.readAnnouncementIds
+      : [],
+    quiz: value.quiz && typeof value.quiz === 'object' ? value.quiz : null,
+    quizHistory: Array.isArray(value.quizHistory) ? value.quizHistory : [],
+    teacherAi:
+      value.teacherAi && typeof value.teacherAi === 'object'
+        ? {
+            result: value.teacherAi.result ?? null,
+            chat: Array.isArray(value.teacherAi.chat) ? value.teacherAi.chat : [],
+          }
+        : null,
   };
 }
 
@@ -251,6 +405,13 @@ function hydrate(): AppState {
     locale: stored.locale === 'ru' ? 'ru' : 'uz',
     version: STATE_VERSION,
     createdAssignments: Array.isArray(stored.createdAssignments) ? stored.createdAssignments : [],
+    createdAnnouncements: Array.isArray(stored.createdAnnouncements)
+      ? (stored.createdAnnouncements as Announcement[])
+      : [],
+    pulses: Array.isArray(stored.pulses) ? (stored.pulses as ClassPulse[]) : [],
+    pulseResponses: Array.isArray(stored.pulseResponses)
+      ? (stored.pulseResponses as ClassPulseResponse[])
+      : [],
     activity: Array.isArray(stored.activity) ? stored.activity : [],
     users: Object.keys(users).length > 0 ? users : initialState.users,
   };
@@ -260,6 +421,8 @@ export interface AppContextValue {
   state: AppState;
   /** The signed-in person's own slice. Empty when nobody is. */
   user: UserState;
+  /** The signed-in teacher's Teacher AI state. */
+  teacherAi: TeacherAiState | null;
   setMode: (mode: AppMode) => void;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -271,6 +434,16 @@ export interface AppContextValue {
   clearPlan: () => void;
   togglePlanItemDone: (id: ID) => void;
   setTutorSession: (session: TutorSession | null) => void;
+  markAnnouncementsRead: (ids: ID[]) => void;
+  setQuiz: (quiz: QuizSession | null) => void;
+  recordQuiz: (entry: QuizHistoryEntry) => void;
+  setTeacherAi: (
+    update: TeacherAiState | ((current: TeacherAiState | null) => TeacherAiState),
+  ) => void;
+  createPulse: (pulse: ClassPulse) => void;
+  updatePulse: (id: ID, change: Partial<ClassPulse>) => void;
+  setPulseStatus: (id: ID, status: PulseStatus, announcement?: Announcement) => void;
+  answerPulse: (response: ClassPulseResponse) => void;
   resetDemo: () => void;
 }
 
@@ -285,6 +458,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const studentId = session?.role === 'student' ? session.userId : DEMO_STUDENT_ID;
   const teacherId = session?.role === 'teacher' ? session.userId : DEMO_TEACHER_ID;
   const currentId = session?.userId ?? null;
+  /* Notifications belong to whoever is signed in, teacher or student. */
+  const readerId = currentId ?? studentId;
 
   /* Persist the whole session under one key. */
   useEffect(() => {
@@ -328,6 +503,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       user,
+      teacherAi: userStateOf(state, teacherId).teacherAi,
       setMode: (mode) => dispatch({ type: 'setMode', mode }),
       setTheme: (theme) => dispatch({ type: 'setTheme', theme }),
       toggleTheme: () =>
@@ -342,9 +518,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       togglePlanItemDone: (id) => dispatch({ type: 'togglePlanItem', id, userId: studentId }),
       setTutorSession: (tutorSession) =>
         dispatch({ type: 'setTutor', session: tutorSession, userId: studentId }),
+      markAnnouncementsRead: (ids) =>
+        dispatch({ type: 'markAnnouncementsRead', ids, userId: readerId }),
+      setQuiz: (quiz) => dispatch({ type: 'setQuiz', quiz, userId: studentId }),
+      recordQuiz: (entry) => dispatch({ type: 'recordQuiz', entry, userId: studentId }),
+      setTeacherAi: (update) => dispatch({ type: 'setTeacherAi', update, userId: teacherId }),
+      createPulse: (pulse) => dispatch({ type: 'createPulse', pulse }),
+      updatePulse: (id, change) => dispatch({ type: 'updatePulse', id, change }),
+      setPulseStatus: (id, status, announcement) =>
+        dispatch({ type: 'setPulseStatus', id, status, announcement }),
+      answerPulse: (response) => dispatch({ type: 'answerPulse', response }),
       resetDemo: () => dispatch({ type: 'reset' }),
     }),
-    [state, user, createAssignment, studentId],
+    [state, user, createAssignment, studentId, teacherId, readerId],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

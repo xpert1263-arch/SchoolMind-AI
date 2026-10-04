@@ -1,15 +1,13 @@
-import { describeConfig, hasGeminiKey } from './env.mjs';
-import {
-  AiUnavailableError,
-  generate,
-  isGroundingAvailable,
-  isTemporarilyUnavailable,
-  needsFreshInformation,
-} from './gemini.mjs';
+import { describeConfig, hasAnyAiKey } from './env.mjs';
+import { generate, isGroundingAvailable, needsFreshInformation } from './ai/index.mjs';
+import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 import { plannerRoutes } from './plannerHandler.mjs';
 import { snapRoutes } from './snapHandler.mjs';
+import { quizRoutes } from './quizHandler.mjs';
 import { tutorRoutes } from './tutorHandler.mjs';
+import { teacherAiRoutes } from './teacherAiHandler.mjs';
+import { parentRoutes } from './parentHandler.mjs';
 
 /* ------------------------------------------------------------------
    POST /api/ask        answer a question with Gemini, optionally
@@ -87,7 +85,7 @@ async function handleAsk(req, res) {
     return;
   }
 
-  if (!hasGeminiKey) {
+  if (!hasAnyAiKey) {
     send(res, 503, { ok: false, error: 'missing_api_key' });
     return;
   }
@@ -131,25 +129,46 @@ async function handleAsk(req, res) {
 
   const system = buildSystemInstruction(locale, Boolean(schoolContext));
 
+  /* A question about what is true right now can only be answered from
+     live search. If search cannot run, the honest outcome is to say so
+     — never to dress stale model knowledge up as today's information.
+     Withholding also costs nothing: no request is sent at all. */
+  const withhold = (reason) => {
+    send(res, 200, {
+      ok: true,
+      text: '',
+      sources: [],
+      usedWeb: false,
+      searchQueries: [],
+      route,
+      routedByModel,
+      degraded: reason,
+      withheld: true,
+    });
+  };
+
+  if (wantsWeb && !isGroundingAvailable()) {
+    withhold('web_unavailable');
+    return;
+  }
+
   try {
     let result;
     let degraded = null;
 
-    if (wantsWeb && !isGroundingAvailable()) {
-      /* The account has already refused grounding recently; go straight
-         to a plain answer and label it rather than burning a request. */
-      result = await generate({ system, messages, web: false });
-      degraded = 'web_unavailable';
-    } else if (wantsWeb) {
+    if (wantsWeb) {
       try {
         result = await generate({ system, messages, web: true });
-        /* Search ran but the provider returned no grounding evidence —
-           say so rather than claiming a grounded answer. */
-        if (!result.usedWeb) degraded = 'no_results';
       } catch (searchError) {
         logFailure('grounded search', searchError);
-        result = await generate({ system, messages, web: false });
-        degraded = 'web_unavailable';
+        withhold('web_unavailable');
+        return;
+      }
+      /* Search ran but brought back no grounding evidence, so there is
+         nothing to stand behind. Say that instead of answering. */
+      if (!result.usedWeb) {
+        withhold('no_results');
+        return;
       }
     } else {
       result = await generate({ system, messages, web: false });
@@ -169,25 +188,17 @@ async function handleAsk(req, res) {
       route,
       routedByModel,
       degraded,
+      withheld: false,
     });
   } catch (error) {
-    if (error instanceof AiUnavailableError) {
-      send(res, 503, { ok: false, error: error.reason });
-      return;
-    }
-    if (isTemporarilyUnavailable(error)) {
-      logFailure(`all models unavailable (status ${error?.status})`, error);
-      send(res, 429, { ok: false, error: 'rate_limited' });
-      return;
-    }
-    logFailure('generateContent', error);
-    send(res, 502, { ok: false, error: 'upstream_error' });
+    sendAiError(res, error, 'ask');
   }
 }
 
 /** Connect-style middleware shared by the dev and preview servers. */
 export function askMiddleware(req, res, next) {
-  const url = (req.url ?? '').split('?')[0];
+  const [url, search = ''] = (req.url ?? '').split('?');
+  const query = new URLSearchParams(search);
 
   if (url === '/api/ask/status' && req.method === 'GET') {
     send(res, 200, { ok: true, ...describeConfig() });
@@ -197,6 +208,9 @@ export function askMiddleware(req, res, next) {
   if (snapRoutes(req, res, url)) return;
   if (plannerRoutes(req, res, url)) return;
   if (tutorRoutes(req, res, url)) return;
+  if (quizRoutes(req, res, url)) return;
+  if (teacherAiRoutes(req, res, url)) return;
+  if (parentRoutes(req, res, url, query)) return;
 
   if (url === '/api/ask') {
     if (req.method !== 'POST') {

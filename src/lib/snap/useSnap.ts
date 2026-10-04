@@ -164,19 +164,22 @@ export function useSnap(): UseSnap {
 
   const analyse = useCallback(
     (helpLevel?: HelpLevel) => {
-      if (!image) return;
+      /* A second click, or Enter landing on the same button, must not
+         start a second reading of the same photograph. */
+      if (!image || status === 'analysing') return;
       runAnalysis(image, helpLevel ?? mode);
     },
-    [image, mode, runAnalysis],
+    [image, mode, runAnalysis, status],
   );
 
   /** Changing the help level re-teaches the same photo. */
   const setMode = useCallback(
     (next: HelpLevel) => {
+      if (status === 'analysing' || next === mode) return;
       setModeState(next);
       if (image && (status === 'done' || status === 'error')) runAnalysis(image, next);
     },
-    [image, runAnalysis, status],
+    [image, mode, runAnalysis, status],
   );
 
   const askFollowUp = useCallback(

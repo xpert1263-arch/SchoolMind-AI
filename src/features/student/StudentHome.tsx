@@ -35,6 +35,7 @@ import { AnnouncementRow } from '@/components/school/AnnouncementRow';
 import { HomeworkDetail } from '@/components/school/HomeworkDetail';
 import { HomeworkRow } from '@/components/school/HomeworkRow';
 import { LessonRow } from '@/components/school/LessonRow';
+import { PulseCard } from './pulse/PulseCard';
 
 export function StudentHome() {
   const { t, text, locale } = useI18n();
@@ -63,6 +64,11 @@ export function StudentHome() {
           {t(`greeting.${dayPart()}`)}, {student.firstName}.
         </h1>
       </header>
+
+      {/* A live ClassPulse belongs where the pupil already is, not
+          behind another navigation item. Renders nothing when there
+          is none. */}
+      <PulseCard />
 
       <MetricStrip>
         <Metric

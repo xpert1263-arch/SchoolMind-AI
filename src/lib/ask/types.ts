@@ -44,6 +44,7 @@ export type AskErrorCode =
   | 'missing_api_key'
   | 'rate_limited'
   | 'network'
+  | 'timeout'
   | 'upstream_error'
   | 'empty_response'
   | 'question_too_long'
@@ -64,6 +65,9 @@ export interface AskTurn {
   /** Set when live search was wanted but could not be delivered. */
   degraded?: 'web_unavailable' | 'no_results';
   searchQueries?: string[];
+  /** The question needed live information that could not be verified,
+   *  so no answer was written. The UI offers a retry instead. */
+  withheld?: boolean;
 }
 
 /**
@@ -77,7 +81,16 @@ export interface AskFocus {
   assignmentId?: ID;
 }
 
+/** What the server can actually do right now. Deliberately phrased as
+ *  capabilities rather than provider names: from v1.6 a text answer may
+ *  come from either provider, while reading an image and citing the
+ *  live web remain Gemini-only — so the UI asks what is possible, not
+ *  who is configured. */
 export interface AskCapabilities {
-  geminiConfigured: boolean;
+  /** Some provider can answer in words. */
+  aiConfigured: boolean;
+  /** An image can be read (Gemini only). */
+  visionConfigured: boolean;
+  /** Grounded search with real citations is available. */
   webSearchEnabled: boolean;
 }

@@ -1,7 +1,7 @@
 import { announcements as allAnnouncements, school } from '@/data/school';
 import { lessonsOfClass, subjectById } from '@/data/queries';
 import { resolveText, type Assignment, type ID, type Locale, type SchoolClass } from '@/data/types';
-import { addDays, daysFromToday, formatDate, todayISO, toISODate, weekdayOf } from '@/lib/dates';
+import { addDays, daysFromToday, formatDate, toISODate, today, todayISO, weekdayOf } from '@/lib/dates';
 import { detectSubjectId } from './subjectMatch';
 import { normalise } from './text';
 import type { AskFocus } from './types';
@@ -51,7 +51,7 @@ export function buildSchoolContext(input: ContextInput): string {
        "before your next lesson" without inventing a time. */
     const upcoming: string[] = [];
     for (let i = 0; i < 14 && upcoming.length < 2; i += 1) {
-      const date = addDays(new Date(), i);
+      const date = addDays(today(), i);
       for (const entry of lessonsOfClass(schoolClass.id, weekdayOf(date))) {
         if (entry.subject.id !== subjectId) continue;
         upcoming.push(`${toISODate(date)} ${entry.slot.start} room ${entry.lesson.room}`);

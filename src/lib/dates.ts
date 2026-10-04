@@ -16,9 +16,40 @@ export function fromISODate(iso: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
-export function today(): Date {
+/** The real calendar day, from the machine clock. */
+function realToday(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+/**
+ * The day SchoolMind treats as today.
+ *
+ * THIS IS THE DEMO CLOCK, and it is the single point that decides what
+ * every date in the app means. The seeded dataset is expressed as
+ * offsets from it, so moving this moves the whole school calendar
+ * together — homework, tests, announcements, the timetable and "bugun"
+ * can never disagree, because they are all counted from one day.
+ *
+ * Before the presentation it returns 10 October 2026, so a rehearsal
+ * on any earlier day shows exactly the calendar the judges will see.
+ * Without it the demo is correct only relative to whatever day it is
+ * run on: rehearsed on 4 October it showed announcements dated 29
+ * September, which is the bug this replaces.
+ *
+ * From 10 October onwards it returns the real day, so the app does not
+ * freeze in the past once the presentation has happened.
+ *
+ * What it does NOT touch: the time of day. `nowMinutes` and `dayPart`
+ * read the real clock, so "your next lesson" and the greeting still
+ * follow the actual hour. And a genuine instant — when a quiz was
+ * finished, when an assignment was created — is still stamped with
+ * `new Date()`. The demo clock moves the calendar, not the stopwatch.
+ */
+export function today(): Date {
+  const real = realToday();
+  const demo = fromISODate(DEMO_REFERENCE_DATE);
+  return real.getTime() < demo.getTime() ? demo : real;
 }
 
 export function todayISO(): string {
@@ -34,6 +65,57 @@ export function addDays(date: Date, days: number): Date {
 /** ISO date `days` away from today — the backbone of the relative dataset. */
 export function isoFromToday(days: number): string {
   return toISODate(addDays(today(), days));
+}
+
+/* ------------------------------------------------------------------
+   The demo calendar.
+
+   The seeded dataset is expressed as offsets from "today", never as
+   fixed dates, so the demo reads as current on whatever day it runs —
+   including 10 October 2026, the presentation date. Nothing below
+   pins the app to that date; it is written down because the
+   chronology has to make sense ON it.
+
+   10 October 2026 is a SATURDAY, which matters. A Saturday is a
+   teaching day in this school and the Sunday after it is not, so an
+   offset counted in calendar days would put "tomorrow's test" on a
+   day with no lessons. `isoTeachingFromToday` counts in teaching days
+   instead, which is what a school timetable actually means by
+   "tomorrow".
+   ------------------------------------------------------------------ */
+
+/** The presentation the demo data must look current on. */
+export const DEMO_REFERENCE_DATE = '2026-10-10';
+
+/** Mon–Sat are teaching days in this school; Sunday is not. */
+export function isTeachingDay(date: Date): boolean {
+  return weekdayOf(date) !== 7;
+}
+
+/**
+ * The date `offset` TEACHING days from today, skipping Sundays.
+ *
+ * `0` is today when today is a teaching day, and the next teaching day
+ * when it is not — so a demo run on a Sunday still has work "due
+ * today" rather than a blank screen. Negative offsets walk backwards
+ * the same way.
+ */
+export function isoTeachingFromToday(offset: number): string {
+  let cursor = today();
+
+  if (!isTeachingDay(cursor)) {
+    /* Start from the nearest teaching day in the direction of travel. */
+    cursor = addDays(cursor, offset < 0 ? -1 : 1);
+    while (!isTeachingDay(cursor)) cursor = addDays(cursor, offset < 0 ? -1 : 1);
+  }
+
+  const step = offset < 0 ? -1 : 1;
+  let remaining = Math.abs(offset);
+  while (remaining > 0) {
+    cursor = addDays(cursor, step);
+    if (isTeachingDay(cursor)) remaining -= 1;
+  }
+  return toISODate(cursor);
 }
 
 export function daysBetween(fromISO: string, toISOStr: string): number {
@@ -173,6 +255,37 @@ export function formatTime(value: Date | string): string {
 
 export function formatLongDate(iso: string, locale: Locale): string {
   return formatDate(iso, locale, { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/**
+ * How a person would refer to this date today: "bugun", "ertaga", or
+ * the weekday by name.
+ *
+ * Seeded copy uses this instead of writing "ertaga" into the text,
+ * because the test it refers to is scheduled in teaching days. On a
+ * Saturday the next teaching day is Monday, and an announcement that
+ * said "tomorrow" would then be wrong — the one thing a demo dataset
+ * must never be about its own dates.
+ */
+export function relativeDayWord(iso: string, locale: Locale): string {
+  const delta = daysFromToday(iso);
+  if (delta === 0) return locale === 'uz' ? 'bugun' : 'сегодня';
+  if (delta === 1) return locale === 'uz' ? 'ertaga' : 'завтра';
+  if (delta === -1) return locale === 'uz' ? 'kecha' : 'вчера';
+
+  const weekday = weekdayOfISO(iso);
+  if (locale === 'uz') return `${UZ_WEEKDAYS_LONG[weekday - 1]} kuni`;
+
+  const RU_IN = [
+    'в понедельник',
+    'во вторник',
+    'в среду',
+    'в четверг',
+    'в пятницу',
+    'в субботу',
+    'в воскресенье',
+  ];
+  return RU_IN[weekday - 1];
 }
 
 /** "08:30" → minutes since midnight, for sorting and "now" comparisons. */

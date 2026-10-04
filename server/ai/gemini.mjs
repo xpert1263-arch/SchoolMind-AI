@@ -1,25 +1,25 @@
 import { GoogleGenAI } from '@google/genai';
-import { activeModel, config, hasGeminiKey, markModelExhausted } from './env.mjs';
+import { activeModel, config, hasGeminiKey, markModelExhausted } from '../env.mjs';
+import { AiUnavailableError, withTimeout } from './errors.mjs';
 
 /* ------------------------------------------------------------------
-   Gemini provider.
+   Gemini — the primary provider.
 
-   Two capabilities, kept separate so the UI can be honest about which
-   one actually ran:
-     - generate()       plain model knowledge, no search
-     - generate({web})  grounded Google Search, returns real citations
+   Three capabilities, kept separate so the UI can be honest about
+   which one actually ran:
+     - generate()            plain model knowledge, no search
+     - generate({web})       grounded Google Search, real citations
+     - generateStructured()  JSON against a schema, text or image
+
+   Vision and grounded search live here and nowhere else: no other
+   provider in this project can read an image or cite the web, so
+   neither capability may ever silently move.
 
    Nothing here fabricates a source. Citations are only ever read back
    out of the provider's own grounding metadata.
    ------------------------------------------------------------------ */
 
-export class AiUnavailableError extends Error {
-  constructor(reason) {
-    super(reason);
-    this.name = 'AiUnavailableError';
-    this.reason = reason;
-  }
-}
+export { AiUnavailableError };
 
 let client = null;
 function getClient() {
@@ -88,21 +88,15 @@ export function isRateLimited(error) {
   return error?.status === 429;
 }
 
-/** Every candidate was either out of quota or busy. From the student's
- *  side both mean the same thing: the assistant cannot answer now. */
-export function isTemporarilyUnavailable(error) {
-  return error?.status === 429 || error?.status === 503;
-}
-
 /* Grounded Google Search needs a billed tier. When the account does not
    have it, every web question would otherwise burn one doomed request
    before falling back. Remember the refusal for a while and skip
-   straight to the ungrounded answer. */
+   straight past search. */
 const GROUNDING_COOLDOWN_MS = 10 * 60 * 1000;
 let groundingBlockedUntil = 0;
 
 export function isGroundingAvailable() {
-  return config.webSearchEnabled && Date.now() >= groundingBlockedUntil;
+  return hasGeminiKey && config.webSearchEnabled && Date.now() >= groundingBlockedUntil;
 }
 
 function noteGroundingRefused() {
@@ -110,6 +104,11 @@ function noteGroundingRefused() {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* A provider call that has not answered by now is not going to. The
+   vision budget is longer because an image takes longer to read. */
+const TEXT_TIMEOUT_MS = 35 * 1000;
+const VISION_TIMEOUT_MS = 60 * 1000;
 
 /** A 503 is momentary oversubscription; park the model only briefly. */
 const BUSY_COOLDOWN_MS = 60 * 1000;
@@ -134,7 +133,7 @@ const BUSY_COOLDOWN_MS = 60 * 1000;
  * nothing about the model's plain-text quota — parking it there would
  * needlessly degrade every later answer.
  */
-async function withModelFailover(run, { onQuota = 'park' } = {}) {
+async function withModelFailover(run, { onQuota = 'park', timeoutMs = TEXT_TIMEOUT_MS } = {}) {
   const attempted = new Set();
   let lastError;
 
@@ -144,14 +143,18 @@ async function withModelFailover(run, { onQuota = 'park' } = {}) {
     attempted.add(model);
 
     try {
-      return await run(model);
+      return await withTimeout(run(model), timeoutMs);
     } catch (error) {
       lastError = error;
+
+      /* A deadline is not a reason to try three more models and keep
+         the student waiting three times as long. */
+      if (error?.name === 'AiTimeoutError') throw error;
 
       if (error?.status === 503) {
         await sleep(1500);
         try {
-          return await run(model);
+          return await withTimeout(run(model), timeoutMs);
         } catch (retryError) {
           lastError = retryError;
           if (retryError?.status !== 503 && retryError?.status !== 429) throw retryError;
@@ -231,25 +234,27 @@ function parseJson(raw) {
 }
 
 /**
- * Structured generation, used by SnapHomework Vision. `parts` may mix
- * text and inlineData (image) parts. The response is validated against
- * `schema` by the provider and parsed here.
+ * Structured generation. `parts` may mix text and inlineData (image)
+ * parts. The response is validated against `schema` by the provider
+ * and parsed here.
  *
  * @returns {Promise<object>} the parsed object
  */
-export async function generateStructured({ system, parts, schema }) {
+export async function generateStructured({ system, parts, schema, vision = false }) {
   const ai = getClient();
-  const response = await withModelFailover((model) =>
-    ai.models.generateContent({
-      model,
-      contents: [{ role: 'user', parts }],
-      config: {
-        systemInstruction: system,
-        temperature: 0.2,
-        responseMimeType: 'application/json',
-        responseSchema: schema,
-      },
-    }),
+  const response = await withModelFailover(
+    (model) =>
+      ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts }],
+        config: {
+          systemInstruction: system,
+          temperature: 0.2,
+          responseMimeType: 'application/json',
+          responseSchema: schema,
+        },
+      }),
+    { timeoutMs: vision ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS },
   );
 
   const text = readText(response);
@@ -281,3 +286,15 @@ export async function needsFreshInformation(question) {
   );
   return readText(response).toUpperCase().includes('WEB');
 }
+
+/** The provider interface the router drives. */
+export const geminiProvider = {
+  id: 'gemini',
+  /** Only ever reaches the server log. */
+  label: 'Gemini',
+  supportsVision: true,
+  supportsGrounding: true,
+  available: () => hasGeminiKey,
+  generate,
+  generateStructured,
+};

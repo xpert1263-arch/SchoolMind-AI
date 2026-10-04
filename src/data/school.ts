@@ -11,16 +11,24 @@ import type {
   Student,
   Subject,
   Teacher,
-  TeachingAssignment,
   Weekday,
 } from './types';
-import { isoFromToday } from '@/lib/dates';
+import { isoFromToday, isoTeachingFromToday, relativeDayWord } from '@/lib/dates';
+import { teacherIdentities, teachingAssignments as teachingRows } from './roster.mjs';
 
 /* ------------------------------------------------------------------
    Demo dataset — one small, believable Uzbek school.
 
-   Everything dated is expressed as an offset from "today" so the demo
-   never looks stale during a presentation.
+   NOTHING HERE IS A FIXED DATE. Every dated record is an offset from
+   "today", so the dataset reads as current on whatever day the demo
+   runs — including 10 October 2026 — and can never go stale the way a
+   hardcoded "29 September" does.
+
+   Schoolwork is offset in TEACHING days rather than calendar days.
+   10 October 2026 is a Saturday: counted in calendar days, "due
+   tomorrow" would fall on a Sunday, when this school has no lessons.
+   Counted in teaching days it falls on the Monday, which is what a
+   timetable means by the next day.
    ------------------------------------------------------------------ */
 
 export const school: School = {
@@ -62,91 +70,45 @@ const subjectRooms: Record<ID, string> = {
 };
 
 /**
- * Who teaches what, to whom. This is the single source of truth for the
- * teacher/subject/class relation: the teacher roster, the timetable and
- * the assignment form all derive from it, so a teacher is never offered
- * a subject they do not actually teach to the selected class.
+ * Who teaches what, to whom.
+ *
+ * The rows themselves live in `roster.mjs`, because from v1.6 the
+ * server enforces them too: a teacher may only set work for, see, or
+ * message the family of a class they actually teach, and that check
+ * cannot live in the browser. Importing them keeps one table instead
+ * of two that can drift apart.
  *
  * Adolat carries mathematics across all three classes and physics for
  * 10-A — a normal pairing, and the reason subject choice is a real
  * decision in the assignment form rather than a single fixed value.
  *
- * Every row here is a permission as much as a fact: a teacher may only
- * set work for a class and subject they appear against.
+ * Every row is a permission as much as a fact.
  */
-export const teachingAssignments: TeachingAssignment[] = [
-  { teacherId: 't1', subjectId: 'math', classIds: ['8a', '9a', '10a'] },
-  { teacherId: 't1', subjectId: 'physics', classIds: ['10a'] },
-  { teacherId: 't2', subjectId: 'physics', classIds: ['8a', '9a'] },
-  { teacherId: 't3', subjectId: 'biology', classIds: ['8a', '9a', '10a'] },
-  { teacherId: 't4', subjectId: 'english', classIds: ['8a', '9a', '10a'] },
-  { teacherId: 't5', subjectId: 'history', classIds: ['8a', '9a', '10a'] },
-  { teacherId: 't6', subjectId: 'native', classIds: ['8a', '9a', '10a'] },
-  { teacherId: 't7', subjectId: 'it', classIds: ['9a', '10a'] },
-  { teacherId: 't8', subjectId: 'chemistry', classIds: ['8a', '9a', '10a'] },
-];
+export { teachingAssignments } from './roster.mjs';
 
-interface TeacherSeed {
-  id: ID;
-  firstName: string;
-  lastName: string;
-  title: LocalizedText;
-}
+/* Names and ids come from the shared roster — the same rows the
+   server reads — so a teacher cannot be renamed on one side only.
+   The job title is UI copy and stays here. */
+const teacherTitles: Record<ID, LocalizedText> = {
+  t1: { uz: 'Matematika va fizika oʻqituvchisi', ru: 'Учитель математики и физики' },
+  t2: { uz: 'Fizika oʻqituvchisi', ru: 'Учитель физики' },
+  t3: { uz: 'Biologiya oʻqituvchisi', ru: 'Учитель биологии' },
+  t4: { uz: 'Ingliz tili oʻqituvchisi', ru: 'Учитель английского' },
+  t5: { uz: 'Tarix oʻqituvchisi', ru: 'Учитель истории' },
+  t6: { uz: 'Ona tili oʻqituvchisi', ru: 'Учитель родного языка' },
+  t7: { uz: 'Informatika oʻqituvchisi', ru: 'Учитель информатики' },
+  t8: { uz: 'Kimyo oʻqituvchisi', ru: 'Учитель химии' },
+};
 
-const teacherSeeds: TeacherSeed[] = [
-  {
-    id: 't1',
-    firstName: 'Adolat',
-    lastName: 'Qurbonova',
-    title: { uz: 'Matematika va fizika oʻqituvchisi', ru: 'Учитель математики и физики' },
-  },
-  {
-    id: 't2',
-    firstName: 'Bekzod',
-    lastName: 'Tursunov',
-    title: { uz: 'Fizika oʻqituvchisi', ru: 'Учитель физики' },
-  },
-  {
-    id: 't3',
-    firstName: 'Dilnoza',
-    lastName: 'Yusupova',
-    title: { uz: 'Biologiya oʻqituvchisi', ru: 'Учитель биологии' },
-  },
-  {
-    id: 't4',
-    firstName: 'Kamola',
-    lastName: 'Saidova',
-    title: { uz: 'Ingliz tili oʻqituvchisi', ru: 'Учитель английского' },
-  },
-  {
-    id: 't5',
-    firstName: 'Jasur',
-    lastName: 'Ergashev',
-    title: { uz: 'Tarix oʻqituvchisi', ru: 'Учитель истории' },
-  },
-  {
-    id: 't6',
-    firstName: 'Gulnora',
-    lastName: 'Ismoilova',
-    title: { uz: 'Ona tili oʻqituvchisi', ru: 'Учитель родного языка' },
-  },
-  {
-    id: 't7',
-    firstName: 'Sardor',
-    lastName: 'Qodirov',
-    title: { uz: 'Informatika oʻqituvchisi', ru: 'Учитель информатики' },
-  },
-  {
-    id: 't8',
-    firstName: 'Shahnoza',
-    lastName: 'Umarova',
-    title: { uz: 'Kimyo oʻqituvchisi', ru: 'Учитель химии' },
-  },
-];
+const teacherSeeds = teacherIdentities.map((identity) => ({
+  ...identity,
+  title: teacherTitles[identity.id],
+}));
+
 
 /** A teacher's subjects and classes are the union of their teaching rows. */
 export const teachers: Teacher[] = teacherSeeds.map((seed) => {
-  const rows = teachingAssignments.filter((row) => row.teacherId === seed.id);
+  const rows = teachingRows.filter((row) => row.teacherId === seed.id);
   return {
     ...seed,
     subjectIds: [...new Set(rows.map((row) => row.subjectId))],
@@ -156,19 +118,14 @@ export const teachers: Teacher[] = teacherSeeds.map((seed) => {
 
 /** The teacher who delivers `subjectId` to `classId`. */
 export function teacherForSubject(subjectId: ID, classId: ID): ID {
-  const row = teachingAssignments.find(
+  const row = teachingRows.find(
     (entry) => entry.subjectId === subjectId && entry.classIds.includes(classId),
   );
   if (!row) throw new Error(`No teacher teaches ${subjectId} to ${classId}`);
   return row.teacherId;
 }
 
-/** Subjects a teacher may set work in for a given class. */
-export function subjectIdsTaughtBy(teacherId: ID, classId: ID): ID[] {
-  return teachingAssignments
-    .filter((row) => row.teacherId === teacherId && row.classIds.includes(classId))
-    .map((row) => row.subjectId);
-}
+export { subjectIdsTaughtBy } from './roster.mjs';
 
 const roster = (classId: ID, names: string[]): Student[] =>
   names.map((full, i) => {
@@ -309,6 +266,12 @@ export const lessons: Lesson[] = buildLessons();
 
 /* ---- assignments --------------------------------------------------- */
 
+/* `createdAgo` is capped at three teaching days on purpose. A seeded
+   assignment "created" six days before the demo day would be dated in
+   early October and read as last month's leftover on the Assignments
+   screen, which is the one thing these fixtures must never look like.
+   Three days back from Saturday 10 October is Wednesday the 7th, so
+   every seeded record stays inside the demo week. */
 type AssignmentSeed = Omit<Assignment, 'dueDate' | 'createdAt' | 'teacherId' | 'origin'> & {
   dueIn: number;
   createdAgo: number;
@@ -381,7 +344,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Сделайте одностраничный сайт о себе на HTML и CSS. Обязательны заголовок, изображение и список.',
     },
     dueIn: 5,
-    createdAgo: 4,
+    createdAgo: 3,
   },
   {
     id: 'a6',
@@ -394,7 +357,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'В каждой задаче отдельно укажите данные, формулу и ответ.',
     },
     dueIn: -1,
-    createdAgo: 4,
+    createdAgo: 3,
   },
   {
     id: 'a7',
@@ -423,7 +386,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Темы 7–10. 20 тестовых вопросов и 2 открытых.',
     },
     dueIn: 1,
-    createdAgo: 6,
+    createdAgo: 3,
   },
   {
     id: 'a9',
@@ -436,7 +399,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Дискриминант, теорема Виета и текстовые задачи.',
     },
     dueIn: 4,
-    createdAgo: 5,
+    createdAgo: 3,
   },
   {
     id: 'a10',
@@ -488,7 +451,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Уравнения в одно и два действия, раскрытие скобок.',
     },
     dueIn: 4,
-    createdAgo: 5,
+    createdAgo: 3,
   },
   {
     id: 'b4',
@@ -561,11 +524,18 @@ export const seedAssignments: Assignment[] = assignmentSeeds.map(
   ({ dueIn, createdAgo, ...rest }) => ({
     ...rest,
     teacherId: teacherForSubject(rest.subjectId, rest.classId),
-    dueDate: isoFromToday(dueIn),
-    createdAt: isoFromToday(-createdAgo),
+    /* Deadlines land on teaching days only — no homework is ever due
+       on a Sunday, whichever day the demo runs on. */
+    dueDate: isoTeachingFromToday(dueIn),
+    createdAt: isoTeachingFromToday(-createdAgo),
     origin: 'seed' as const,
   }),
 );
+
+/** The biology test in the seed set (a8), due on the next teaching
+ *  day. The pinned announcement below refers to this very date, so the
+ *  two can never disagree about when it is. */
+export const BIOLOGY_TEST_DATE = isoTeachingFromToday(1);
 
 /** Homework the student had already ticked off before the demo starts. */
 export const seedCompletedAssignmentIds: ID[] = ['a3'];
@@ -581,7 +551,14 @@ const announcementSeeds: AnnouncementSeed[] = [
     audience: 'all',
     classId: '9a',
     pinned: true,
-    title: { uz: 'Biologiyadan nazorat ishi — ertaga', ru: 'Контрольная по биологии — завтра' },
+    /* "Tomorrow" is computed, not written. The test is scheduled in
+       teaching days, so on a Saturday it is the Monday — and an
+       announcement that insisted on "ertaga" would be lying about a
+       date the student can see two screens away. */
+    title: {
+      uz: `Biologiyadan nazorat ishi — ${relativeDayWord(BIOLOGY_TEST_DATE, 'uz')}`,
+      ru: `Контрольная по биологии — ${relativeDayWord(BIOLOGY_TEST_DATE, 'ru')}`,
+    },
     body: {
       uz: '9-A sinf uchun nazorat ishi 21-xonada, 1-darsda oʻtkaziladi. Daftar va qalam olib keling.',
       ru: 'Контрольная для 9-A пройдёт в каб. 21 на первом уроке. Возьмите тетрадь и ручку.',
@@ -622,12 +599,15 @@ const announcementSeeds: AnnouncementSeed[] = [
       uz: 'Ilmiy-ommabop adabiyotlar boʻlimi yangilandi. Kutubxona 09:00–17:00 ishlaydi.',
       ru: 'Обновлён раздел научно-популярной литературы. Библиотека работает 09:00–17:00.',
     },
-    daysAgo: 4,
+    /* Three teaching days back, which keeps the four notices inside
+       the same week as the demo day rather than trailing into the
+       one before it. */
+    daysAgo: 3,
   },
 ];
 
 export const announcements: Announcement[] = announcementSeeds
-  .map(({ daysAgo, ...rest }) => ({ ...rest, date: isoFromToday(-daysAgo) }))
+  .map(({ daysAgo, ...rest }) => ({ ...rest, date: isoTeachingFromToday(-daysAgo) }))
   .sort((a, b) => {
     if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
     return b.date.localeCompare(a.date);

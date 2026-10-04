@@ -52,6 +52,7 @@ export type SnapErrorCode =
   | 'missing_api_key'
   | 'rate_limited'
   | 'network'
+  | 'timeout'
   | 'upstream_error'
   | 'malformed_response'
   | 'empty_response'

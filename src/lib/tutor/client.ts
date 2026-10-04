@@ -1,3 +1,4 @@
+import { postJson } from '@/lib/ai/request';
 import type { WebSource } from '@/lib/ask/types';
 import type { Difficulty, TutorAction, TutorErrorCode, TutorMode, Verdict } from './types';
 
@@ -9,6 +10,7 @@ const ERRORS: TutorErrorCode[] = [
   'missing_api_key',
   'rate_limited',
   'network',
+  'timeout',
   'upstream_error',
   'malformed_response',
   'empty_response',
@@ -60,34 +62,18 @@ export async function postTutor(
   body: TutorRequest,
   signal?: AbortSignal,
 ): Promise<TutorResponse> {
-  let response: Response;
-  try {
-    response = await fetch('/api/tutor', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch {
-    return { ok: false, error: 'network' };
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ok: false, error: 'server_error' };
-  }
-
-  const data = payload as {
+  const result = await postJson<{
     ok?: boolean;
     error?: unknown;
     turn?: TurnPayload;
     sources?: WebSource[];
     usedWeb?: boolean;
     degraded?: 'web_unavailable' | 'no_results' | null;
-  };
-  if (!response.ok || data.ok !== true || !data.turn) {
+  }>('/api/tutor', body, { signal });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const data = result.body;
+  if (result.status >= 400 || data.ok !== true || !data.turn) {
     return { ok: false, error: toErrorCode(data.error) };
   }
   return {

@@ -9,12 +9,16 @@ export function Popover({
   align = 'end',
   widthClass = 'w-72',
   label,
+  onOpen,
 }: {
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
   children: (close: () => void) => ReactNode;
   align?: 'start' | 'end';
   widthClass?: string;
   label: string;
+  /** Fires when the popover is opened — the moment its contents are
+   *  actually on screen, which is what "read" means for a bell. */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -37,7 +41,16 @@ export function Popover({
 
   return (
     <div ref={rootRef} className="relative">
-      {trigger({ open, toggle: () => setOpen((v) => !v) })}
+      {trigger({
+        open,
+        toggle: () => {
+          /* The callback has to fire here, in the event handler. React
+             may run a state updater during a render pass, and a parent
+             setState from there is a warning and a bug. */
+          if (!open) onOpen?.();
+          setOpen(!open);
+        },
+      })}
       <AnimatePresence>
         {open ? (
           <motion.div
