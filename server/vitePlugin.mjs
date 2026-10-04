@@ -27,7 +27,14 @@ export function askMySchoolApi() {
           '[schoolmind-ai] no AI provider configured — school-data answers and SchoolMind fallbacks still work. See .env.example.',
         );
       }
-      console.info(`[schoolmind-ai] grounded web search ${webSearchEnabled ? 'on' : 'off'}.`);
+      /* Deliberately phrased as "available", not "on": configuration
+         is not success. A live answer is only ever claimed after a
+         search has actually run and returned pages. */
+      console.info(
+        webSearchEnabled
+          ? '[schoolmind-ai] live web search available (Gemini grounding, then Groq browser_search). A search must actually run before any answer is treated as current.'
+          : '[schoolmind-ai] no live web search mechanism configured — current-information questions will be declined rather than guessed.',
+      );
     });
 
     if (!hasTelegramToken) {

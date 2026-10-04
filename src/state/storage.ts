@@ -60,7 +60,7 @@ export function readStoredState<T>(): (Partial<T> & { version?: number }) | null
    current, and it does on the day of the presentation. Rehearsing a
    week earlier, though, "four teaching days ago" resolved to 29
    September, and the notification panel showed a September date on a
-   screen that is meant to look like 10 October. The dates were never
+   screen that is meant to look like the presentation day. They were never
    stale data; they were correctly counted from the wrong day.
 
    THE FIX is one line in `dates.ts` — the demo clock — and it needs
@@ -70,7 +70,7 @@ export function readStoredState<T>(): (Partial<T> & { version?: number }) | null
    WHAT DOES NEED MIGRATING is the opposite case: records a real
    person created DURING a rehearsal. An assignment set on 4 October
    with a deadline of 6 October is genuine work, but on a timeline
-   that now says 10 October it reads as a missed deadline from last
+   that now says 8 October it reads as a missed deadline from last
    week. Those are re-anchored here: shifted forward as a block, so
    each one keeps exactly the gap it had between the day it was made
    and the day it was due.

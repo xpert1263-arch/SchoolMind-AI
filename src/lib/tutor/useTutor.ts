@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n/useI18n';
 import { fetchCapabilities } from '@/lib/ask/client';
 import type { AskCapabilities } from '@/lib/ask/types';
 import { daysFromToday } from '@/lib/dates';
+import { checkTopic, type TopicProblem } from '@/lib/topic';
 import { useCurrentStudent, useStudentItems } from '@/state/selectors';
 import { useApp } from '@/state/store';
 import { postTutor, type TutorRequest } from './client';
@@ -70,6 +71,8 @@ function historyOf(session: TutorSession): TutorRequest['history'] {
 }
 
 export interface UseTutor {
+  /** Why a typed topic was refused, if it was. */
+  topicProblem: TopicProblem | null;
   session: TutorSession | null;
   busy: boolean;
   error: TutorErrorCode | null;
@@ -97,6 +100,7 @@ export function useTutor(): UseTutor {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<TutorErrorCode | null>(null);
+  const [topicProblem, setTopicProblem] = useState<TopicProblem | null>(null);
   const [capabilities, setCapabilities] = useState<AskCapabilities | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -259,8 +263,15 @@ export function useTutor(): UseTutor {
 
   const start = useCallback(
     (subjectId: ID, topic: string, mode: TutorMode) => {
-      const trimmed = topic.trim();
-      if (!trimmed) return;
+      /* An impossible topic is refused before anything is spent, so a
+         lesson is never built on a premise that cannot be true. */
+      const checked = checkTopic(topic);
+      if (!checked.ok) {
+        setTopicProblem(checked.problem);
+        return;
+      }
+      setTopicProblem(null);
+      const trimmed = checked.topic;
       const fresh: TutorSession = {
         subjectId,
         topic: trimmed,
@@ -334,6 +345,8 @@ export function useTutor(): UseTutor {
     session,
     busy,
     error,
+    /** Why a typed topic was refused, if it was. */
+    topicProblem,
     capabilities,
     subjects,
     revealedHints: session?.revealedHints ?? 0,

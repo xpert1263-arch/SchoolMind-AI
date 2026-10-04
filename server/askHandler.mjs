@@ -1,5 +1,5 @@
 import { describeConfig, hasAnyAiKey } from './env.mjs';
-import { generate, isGroundingAvailable, needsFreshInformation } from './ai/index.mjs';
+import { generate, liveSearch, needsFreshInformation } from './ai/index.mjs';
 import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 import { plannerRoutes } from './plannerHandler.mjs';
@@ -130,9 +130,10 @@ async function handleAsk(req, res) {
   const system = buildSystemInstruction(locale, Boolean(schoolContext));
 
   /* A question about what is true right now can only be answered from
-     live search. If search cannot run, the honest outcome is to say so
-     — never to dress stale model knowledge up as today's information.
-     Withholding also costs nothing: no request is sent at all. */
+     a real search. There are two of those — Gemini's grounded Google
+     Search and Groq's browser_search — and if neither runs, the
+     honest outcome is to say so. Never to dress model recollection up
+     as today's information. */
   const withhold = (reason) => {
     send(res, 200, {
       ok: true,
@@ -147,32 +148,37 @@ async function handleAsk(req, res) {
     });
   };
 
-  if (wantsWeb && !isGroundingAvailable()) {
-    withhold('web_unavailable');
-    return;
-  }
-
   try {
-    let result;
-    let degraded = null;
-
     if (wantsWeb) {
-      try {
-        result = await generate({ system, messages, web: true });
-      } catch (searchError) {
-        logFailure('grounded search', searchError);
+      const found = await liveSearch({ system, messages });
+
+      /* No search mechanism produced verifiable evidence. */
+      if (!found) {
         withhold('web_unavailable');
         return;
       }
-      /* Search ran but brought back no grounding evidence, so there is
-         nothing to stand behind. Say that instead of answering. */
-      if (!result.usedWeb) {
+      if (!found.text) {
         withhold('no_results');
         return;
       }
-    } else {
-      result = await generate({ system, messages, web: false });
+
+      send(res, 200, {
+        ok: true,
+        text: found.text,
+        sources: found.sources,
+        /* True only because a search actually ran and returned
+           pages we can link to. */
+        usedWeb: true,
+        searchQueries: found.searchQueries,
+        route,
+        routedByModel,
+        degraded: null,
+        withheld: false,
+      });
+      return;
     }
+
+    const result = await generate({ system, messages });
 
     if (!result.text) {
       send(res, 502, { ok: false, error: 'empty_response' });
@@ -182,12 +188,12 @@ async function handleAsk(req, res) {
     send(res, 200, {
       ok: true,
       text: result.text,
-      sources: result.sources,
-      usedWeb: result.usedWeb,
-      searchQueries: result.searchQueries,
+      sources: [],
+      usedWeb: false,
+      searchQueries: [],
       route,
       routedByModel,
-      degraded,
+      degraded: null,
       withheld: false,
     });
   } catch (error) {

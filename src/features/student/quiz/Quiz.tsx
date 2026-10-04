@@ -201,7 +201,16 @@ export function Quiz() {
                   </Select>
                 </Field>
 
-                <Field label={t('quiz.topic')} htmlFor="quiz-topic" hint={t('quiz.topicHint')}>
+                <Field
+                  label={t('quiz.topic')}
+                  htmlFor="quiz-topic"
+                  hint={t('quiz.topicHint')}
+                  error={
+                    quiz.topicProblem
+                      ? t(`topic.${quiz.topicProblem}` as TranslationKey)
+                      : undefined
+                  }
+                >
                   <TextInput
                     id="quiz-topic"
                     value={topic}

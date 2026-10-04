@@ -15,6 +15,11 @@
 export const AI_TIMEOUT_MS = 40_000;
 /** Reading an image legitimately takes longer. */
 export const VISION_TIMEOUT_MS = 70_000;
+/* A live search runs queries and opens pages on the provider's side,
+   so it routinely takes two or three times as long as an ordinary
+   answer. Giving it the normal deadline would abort searches that
+   were about to succeed. */
+export const SEARCH_TIMEOUT_MS = 85_000;
 
 export type AiTransportError = 'network' | 'timeout' | 'server_error';
 

@@ -1,5 +1,5 @@
 import { hasAnyAiKey } from './env.mjs';
-import { generate, generateStructured, isGroundingAvailable } from './ai/index.mjs';
+import { generateStructured, liveSearch } from './ai/index.mjs';
 import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 
@@ -175,21 +175,32 @@ async function handleSources(res, input, messages) {
     'Summarise what the sources say in at most 4 short sentences. Never invent a source or a URL.',
   ].join('\n');
 
-  let result;
-  let degraded = null;
-  if (!isGroundingAvailable()) {
-    result = await generate({ system, messages, web: false });
-    degraded = 'web_unavailable';
-  } else {
-    try {
-      result = await generate({ system, messages, web: true });
-      if (!result.usedWeb) degraded = 'no_results';
-    } catch (error) {
-      logFailure('tutor grounded search', error);
-      result = await generate({ system, messages, web: false });
-      degraded = 'web_unavailable';
-    }
+  /* Reading on a topic means real pages. Asking a model with no
+     search to "find sources" is how invented URLs get onto a
+     student's screen, so when no search runs this returns nothing
+     and says why. */
+  const found = await liveSearch({ system, messages });
+
+  if (!found) {
+    send(res, 200, {
+      ok: true,
+      turn: {
+        verdict: null,
+        feedback: '',
+        explanation: '',
+        example: '',
+        question: '',
+        hints: [],
+      },
+      sources: [],
+      usedWeb: false,
+      degraded: 'web_unavailable',
+    });
+    return;
   }
+
+  const result = found;
+  const degraded = null;
 
   send(res, 200, {
     ok: true,

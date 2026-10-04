@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n/useI18n';
 import { fetchCapabilities } from '@/lib/ask/client';
 import type { AskCapabilities } from '@/lib/ask/types';
 import { todayISO } from '@/lib/dates';
+import { checkTopic, type TopicProblem } from '@/lib/topic';
 import { useCurrentStudent, useStudentItems } from '@/state/selectors';
 import { useApp } from '@/state/store';
 import { bankHasSubject, bankQuestions } from './bank';
@@ -65,6 +66,8 @@ function looksEqual(given: string, expected: string): boolean {
 
 export interface UseQuiz {
   session: QuizSession | null;
+  /** Why a typed topic was refused, if it was. */
+  topicProblem: TopicProblem | null;
   status: QuizStatus;
   error: QuizErrorCode | null;
   capabilities: AskCapabilities | null;
@@ -92,6 +95,7 @@ export function useQuiz(): UseQuiz {
 
   const [status, setStatus] = useState<QuizStatus>(user.quiz ? 'running' : 'setup');
   const [error, setError] = useState<QuizErrorCode | null>(null);
+  const [topicProblem, setTopicProblem] = useState<TopicProblem | null>(null);
   const [capabilities, setCapabilities] = useState<AskCapabilities | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -199,8 +203,16 @@ export function useQuiz(): UseQuiz {
 
   const start = useCallback(
     (subjectId: ID, rawTopic: string, difficulty: QuizDifficulty, length: QuizLength) => {
-      const topic = rawTopic.trim();
-      if (!topic || status === 'generating' || status === 'checking') return;
+      if (status === 'generating' || status === 'checking') return;
+      /* Refused before a request is spent: a quiz is never written
+         about a period that cannot exist. */
+      const checked = checkTopic(rawTopic);
+      if (!checked.ok) {
+        setTopicProblem(checked.problem);
+        return;
+      }
+      setTopicProblem(null);
+      const topic = checked.topic;
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -397,6 +409,7 @@ export function useQuiz(): UseQuiz {
 
   return {
     session,
+    topicProblem,
     status,
     error,
     capabilities,

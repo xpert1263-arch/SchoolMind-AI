@@ -85,6 +85,21 @@ export const hasTelegramToken = Boolean(config.telegramBotToken);
  *  this instead of asking about one provider by name. */
 export const hasAnyAiKey = hasGeminiKey || hasGroqKey;
 
+/** Groq can search only on its gpt-oss models; a Llama fallback
+ *  cannot, so a pinned Llama means no Groq search path. */
+export const hasGroqSearchModel =
+  hasGroqKey && config.groqModels.some((model) => /gpt-oss/i.test(model));
+
+/**
+ * Whether SOME real live-search mechanism is configured: Gemini's
+ * grounded Google Search, or Groq's browser_search.
+ *
+ * This says a path EXISTS. It never says a search succeeded — only a
+ * completed search that returned pages may claim that, and that
+ * decision is made per request, not from configuration.
+ */
+export const hasSearchPath = (config.webSearchEnabled && hasGeminiKey) || hasGroqSearchModel;
+
 /* Free-tier quota is counted per model and resets daily, so a refusal
    is a temporary fact about one model rather than a permanent
    downgrade. Each exhausted model is parked for a while and the first
@@ -138,8 +153,10 @@ export function describeConfig() {
     aiConfigured: hasAnyAiKey,
     /** Reading an image needs Gemini; Groq cannot do it. */
     visionConfigured: hasGeminiKey,
-    /** Grounded search needs Gemini and a plan that includes it. */
-    webSearchEnabled: config.webSearchEnabled && hasGeminiKey,
+    /** A real search mechanism is configured — Gemini grounding or
+     *  Groq browser_search. Not a promise that any given search will
+     *  succeed; the answer says that, per question. */
+    webSearchEnabled: hasSearchPath,
     /** Parent Connect delivery. */
     telegramConfigured: hasTelegramToken,
   };

@@ -1,6 +1,6 @@
 import { subjectIdsTaughtBy, teacherTeachesClass } from '../src/data/roster.mjs';
 import { hasAnyAiKey } from './env.mjs';
-import { generate, generateStructured, isGroundingAvailable } from './ai/index.mjs';
+import { generate, generateStructured, liveSearch } from './ai/index.mjs';
 import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 import { generateQuestions } from './quizHandler.mjs';
@@ -409,25 +409,9 @@ ${input.evidence}`,
          of dressing stale model knowledge up as today's news. No
          request is sent at all. */
       const wantsWeb = payload.web === true;
-      if (wantsWeb && !isGroundingAvailable()) {
-        send(res, 200, {
-          ok: true,
-          action,
-          chat: { text: '', sources: [], usedWeb: false },
-          withheld: true,
-          degraded: 'web_unavailable',
-        });
-        return;
-      }
-
-      const system = chatSystem(input.locale, input.schoolContext);
-
       if (wantsWeb) {
-        let result;
-        try {
-          result = await generate({ system, messages, web: true });
-        } catch (error) {
-          logFailure('teacher-ai grounded search', error);
+        const found = await liveSearch({ system, messages });
+        if (!found) {
           send(res, 200, {
             ok: true,
             action,
@@ -437,20 +421,10 @@ ${input.evidence}`,
           });
           return;
         }
-        if (!result.usedWeb) {
-          send(res, 200, {
-            ok: true,
-            action,
-            chat: { text: '', sources: [], usedWeb: false },
-            withheld: true,
-            degraded: 'no_results',
-          });
-          return;
-        }
         send(res, 200, {
           ok: true,
           action,
-          chat: { text: result.text, sources: result.sources, usedWeb: true },
+          chat: { text: found.text, sources: found.sources, usedWeb: true },
           withheld: false,
           degraded: null,
         });

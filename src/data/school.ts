@@ -21,14 +21,14 @@ import { teacherIdentities, teachingAssignments as teachingRows } from './roster
 
    NOTHING HERE IS A FIXED DATE. Every dated record is an offset from
    "today", so the dataset reads as current on whatever day the demo
-   runs — including 10 October 2026 — and can never go stale the way a
+   runs — including 8 October 2026 — and can never go stale the way a
    hardcoded "29 September" does.
 
    Schoolwork is offset in TEACHING days rather than calendar days.
-   10 October 2026 is a Saturday: counted in calendar days, "due
-   tomorrow" would fall on a Sunday, when this school has no lessons.
-   Counted in teaching days it falls on the Monday, which is what a
-   timetable means by the next day.
+   Offsets count TEACHING days, not calendar days: this school does
+   not teach on Sundays, so a naive offset can land a deadline on a
+   day with no lessons. Counting teaching days is what a timetable
+   means by "the next day".
    ------------------------------------------------------------------ */
 
 export const school: School = {
@@ -266,11 +266,11 @@ export const lessons: Lesson[] = buildLessons();
 
 /* ---- assignments --------------------------------------------------- */
 
-/* `createdAgo` is capped at three teaching days on purpose. A seeded
+/* `createdAgo` is capped at two teaching days on purpose. A seeded
    assignment "created" six days before the demo day would be dated in
    early October and read as last month's leftover on the Assignments
    screen, which is the one thing these fixtures must never look like.
-   Three days back from Saturday 10 October is Wednesday the 7th, so
+   Two teaching days back from Thursday 8 October is Tuesday the
    every seeded record stays inside the demo week. */
 type AssignmentSeed = Omit<Assignment, 'dueDate' | 'createdAt' | 'teacherId' | 'origin'> & {
   dueIn: number;
@@ -318,7 +318,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Workbook, стр. 26–27. Выучите 15 новых слов письменно.',
     },
     dueIn: 0,
-    createdAgo: 3,
+    createdAgo: 2,
   },
   {
     id: 'a4',
@@ -344,7 +344,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Сделайте одностраничный сайт о себе на HTML и CSS. Обязательны заголовок, изображение и список.',
     },
     dueIn: 5,
-    createdAgo: 3,
+    createdAgo: 2,
   },
   {
     id: 'a6',
@@ -357,7 +357,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'В каждой задаче отдельно укажите данные, формулу и ответ.',
     },
     dueIn: -1,
-    createdAgo: 3,
+    createdAgo: 2,
   },
   {
     id: 'a7',
@@ -386,7 +386,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Темы 7–10. 20 тестовых вопросов и 2 открытых.',
     },
     dueIn: 1,
-    createdAgo: 3,
+    createdAgo: 2,
   },
   {
     id: 'a9',
@@ -399,7 +399,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Дискриминант, теорема Виета и текстовые задачи.',
     },
     dueIn: 4,
-    createdAgo: 3,
+    createdAgo: 2,
   },
   {
     id: 'a10',
@@ -451,7 +451,7 @@ const assignmentSeeds: AssignmentSeed[] = [
       ru: 'Уравнения в одно и два действия, раскрытие скобок.',
     },
     dueIn: 4,
-    createdAgo: 3,
+    createdAgo: 2,
   },
   {
     id: 'b4',
@@ -599,10 +599,10 @@ const announcementSeeds: AnnouncementSeed[] = [
       uz: 'Ilmiy-ommabop adabiyotlar boʻlimi yangilandi. Kutubxona 09:00–17:00 ishlaydi.',
       ru: 'Обновлён раздел научно-популярной литературы. Библиотека работает 09:00–17:00.',
     },
-    /* Three teaching days back, which keeps the four notices inside
-       the same week as the demo day rather than trailing into the
-       one before it. */
-    daysAgo: 3,
+    /* Two teaching days back. The notice board is meant to read as
+       "this week": anything older looks like a demo nobody has
+       touched since last term. */
+    daysAgo: 2,
   },
 ];
 

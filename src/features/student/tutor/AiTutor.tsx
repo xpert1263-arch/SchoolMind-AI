@@ -237,7 +237,16 @@ export function AiTutor() {
                   </Select>
                 </Field>
 
-                <Field label={t('tutor.topic')} htmlFor="tutor-topic" hint={t('tutor.topicHint')}>
+                <Field
+                  label={t('tutor.topic')}
+                  htmlFor="tutor-topic"
+                  hint={t('tutor.topicHint')}
+                  error={
+                    tutor.topicProblem
+                      ? t(`topic.${tutor.topicProblem}` as TranslationKey)
+                      : undefined
+                  }
+                >
                   <TextInput
                     id="tutor-topic"
                     value={topic}

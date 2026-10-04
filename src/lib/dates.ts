@@ -31,13 +31,13 @@ function realToday(): Date {
  * together — homework, tests, announcements, the timetable and "bugun"
  * can never disagree, because they are all counted from one day.
  *
- * Before the presentation it returns 10 October 2026, so a rehearsal
+ * Before the presentation it returns 8 October 2026, so a rehearsal
  * on any earlier day shows exactly the calendar the judges will see.
  * Without it the demo is correct only relative to whatever day it is
  * run on: rehearsed on 4 October it showed announcements dated 29
  * September, which is the bug this replaces.
  *
- * From 10 October onwards it returns the real day, so the app does not
+ * From 8 October onwards it returns the real day, so the app does not
  * freeze in the past once the presentation has happened.
  *
  * What it does NOT touch: the time of day. `nowMinutes` and `dayPart`
@@ -72,20 +72,20 @@ export function isoFromToday(days: number): string {
 
    The seeded dataset is expressed as offsets from "today", never as
    fixed dates, so the demo reads as current on whatever day it runs —
-   including 10 October 2026, the presentation date. Nothing below
+   including 8 October 2026, the presentation date. Nothing below
    pins the app to that date; it is written down because the
    chronology has to make sense ON it.
 
-   10 October 2026 is a SATURDAY, which matters. A Saturday is a
-   teaching day in this school and the Sunday after it is not, so an
-   offset counted in calendar days would put "tomorrow's test" on a
-   day with no lessons. `isoTeachingFromToday` counts in teaching days
-   instead, which is what a school timetable actually means by
-   "tomorrow".
+   8 October 2026 is a THURSDAY. Offsets are still counted in
+   TEACHING days rather than calendar days, because the school does
+   not teach on Sundays: counted naively, work due "in three days"
+   from a Friday would land on a day with no lessons. Counting
+   teaching days is what a timetable actually means by "the next
+   day".
    ------------------------------------------------------------------ */
 
 /** The presentation the demo data must look current on. */
-export const DEMO_REFERENCE_DATE = '2026-10-10';
+export const DEMO_REFERENCE_DATE = '2026-10-08';
 
 /** Mon–Sat are teaching days in this school; Sunday is not. */
 export function isTeachingDay(date: Date): boolean {

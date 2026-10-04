@@ -226,25 +226,34 @@ function TurnView({
       </h2>
 
       <div className="border-l-2 border-line pl-4 sm:pl-5">
-        <AnimatePresence mode="wait" initial={false}>
-          {pending ? (
-            <motion.p
-              key="pending"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center gap-2 py-1 text-[13.5px] text-ink-muted"
-              role="status"
-              aria-live="polite"
-            >
+        {/* The waiting line is NOT inside AnimatePresence, and the
+            answer is not held back by mode="wait".
+
+            Both choices exist for the same reason: an exit animation
+            needs requestAnimationFrame, and browsers suspend that for
+            a hidden tab. Under mode="wait" the answer would wait for
+            a frame that never comes, so a student who switched away
+            mid-question returned to a spinner that never resolved.
+            Rendering the waiting line as a plain element lets it
+            disappear the instant the answer exists, in every
+            visibility state. */}
+        {pending ? (
+          <p
+            className="flex items-center gap-2 py-1 text-[13.5px] text-ink-muted"
+            role="status"
+            aria-live="polite"
+          >
               {turn.status === 'searching' ? (
                 <Globe size={14} aria-hidden className="animate-pulse text-info-text" />
               ) : (
                 <Loader2 size={14} aria-hidden className="animate-spin" />
               )}
-              {turn.status === 'searching' ? t('ask.searching') : t('ask.thinking')}
-            </motion.p>
-          ) : (
+            {turn.status === 'searching' ? t('ask.searching') : t('ask.thinking')}
+          </p>
+        ) : null}
+
+        <AnimatePresence initial={false}>
+          {!pending ? (
             <motion.div
               key="answer"
               initial={{ opacity: 0, y: 4 }}
@@ -292,7 +301,7 @@ function TurnView({
                 </div>
               ) : null}
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
     </article>

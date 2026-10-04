@@ -1,7 +1,7 @@
 import { hasAnyAiKey, hasGroqKey, hasGeminiKey } from '../env.mjs';
 import { AiUnavailableError, isRetriable, classifyAiError } from './errors.mjs';
 import { geminiProvider, isGroundingAvailable, needsFreshInformation } from './gemini.mjs';
-import { groqProvider, listUsableModels } from './groq.mjs';
+import { canSearch, groqProvider, listUsableModels, searchWeb as groqSearchWeb } from './groq.mjs';
 
 /* ------------------------------------------------------------------
    The provider router.
@@ -54,6 +54,13 @@ export function visionAvailable() {
   return hasGeminiKey;
 }
 
+/** True when SOME real search mechanism is configured. It says a path
+ *  exists, never that a search succeeded — only a completed search
+ *  with evidence may claim that. */
+export function searchConfigured() {
+  return (hasGeminiKey && isGroundingAvailable()) || canSearch();
+}
+
 /** Logged, never sent: says which provider served a call and why the
  *  one before it did not. */
 function noteFailover(fromId, error, toId) {
@@ -100,17 +107,62 @@ async function withProviderFailover(attempt, { geminiOnly = false } = {}) {
 }
 
 /**
- * Plain or grounded text generation.
- *
- * A grounded request never leaves Gemini: Groq cannot cite anything,
- * and an uncited answer to "what happened today" is exactly what
- * AskMySchool refuses to produce.
+ * Plain text generation. Never searches: a question about what is
+ * true right now goes to `liveSearch` instead.
  */
-export async function generate({ system, messages, web = false }) {
-  return withProviderFailover(
-    (provider) => provider.generate({ system, messages, web }),
-    { geminiOnly: web },
-  );
+export async function generate({ system, messages }) {
+  return withProviderFailover((provider) => provider.generate({ system, messages, web: false }));
+}
+
+/**
+ * A question that can only be answered from the live web.
+ *
+ * Two real mechanisms, tried in order, and nothing else:
+ *
+ *   Gemini grounded Google Search — citations from the provider's own
+ *   grounding metadata.
+ *
+ *   Groq browser_search — searches and page reads executed on Groq's
+ *   servers, with the record of what ran returned alongside.
+ *
+ * What this function will NOT do is fall back to an ordinary
+ * completion. If neither search runs, it returns null and the caller
+ * says the information could not be verified. An ungrounded answer to
+ * "what happened today" is a guess wearing a timestamp, and that is
+ * the one thing AskMySchool has never been willing to show.
+ *
+ * @returns {Promise<null | {text, sources, usedWeb, searchQueries, via}>}
+ */
+export async function liveSearch({ system, messages }) {
+  /* 1. Gemini grounding, when the plan actually has it. */
+  if (hasGeminiKey && isGroundingAvailable()) {
+    try {
+      const result = await geminiProvider.generate({ system, messages, web: true });
+      /* usedWeb is only true when grounding evidence came back. */
+      if (result.usedWeb && result.sources.length > 0) {
+        return { ...result, via: 'gemini' };
+      }
+      console.info('[schoolmind-ai] gemini grounding returned no evidence — trying groq search');
+    } catch (error) {
+      noteFailover('gemini search', error, canSearch() ? 'groq search' : null);
+    }
+  }
+
+  /* 2. Groq's browser_search. */
+  if (canSearch()) {
+    try {
+      const result = await groqSearchWeb({ system, messages });
+      console.info(
+        `[schoolmind-ai] groq browser_search ran (${result.searchQueries.length} queries, ${result.sources.length} sources)`,
+      );
+      return { ...result, via: 'groq' };
+    } catch (error) {
+      noteFailover('groq search', error, null);
+    }
+  }
+
+  /* No real search ran. The caller withholds. */
+  return null;
 }
 
 /**

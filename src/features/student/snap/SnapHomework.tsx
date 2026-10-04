@@ -133,8 +133,10 @@ export function SnapHomework() {
             />
           ) : null}
 
+          {/* No mode="wait" below: see AskSchool. A hidden tab
+              suspends the frames an exit animation needs. */}
           {snap.status === 'analysing' ? (
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               <motion.p
                 key={snap.phase}
                 initial={{ opacity: 0, y: 4 }}

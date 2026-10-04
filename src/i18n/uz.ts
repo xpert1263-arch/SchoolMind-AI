@@ -359,7 +359,7 @@ export const uz = {
         'Jonli internet qidiruvi ishlamadi. Quyidagi javob faqat AI bilimiga asoslangan.',
       noWebResults: 'Qidiruv ishonchli manba qaytarmadi, shuning uchun manbalar koʻrsatilmadi.',
       liveUnavailable:
-        'Jonli internet qidiruvi hozir mavjud emas. Bugungi maʼlumotni ishonchli tekshirib bera olmayman, shuning uchun javob yozmadim. Birozdan soʻng qayta urinib koʻring yoki umumiy mavzudagi savol bering.',
+        'Hozirgi maʼlumotni internet orqali tasdiqlab boʻlmadi. Birozdan soʻng qayta urinib koʻring.',
       liveNoResults:
         'Qidiruv ishonchli manba qaytarmadi. Tasdiqlanmagan maʼlumotni bugungi yangilik sifatida koʻrsatmayman.',
     },
@@ -555,7 +555,7 @@ export const uz = {
     optionalNote: 'Quyidagilar maktab topshirigʻi emas — AI taklif qilgan ixtiyoriy mashgʻulot.',
     noKeyTitle: 'AI hozircha ulanmagan',
     noKeyBody:
-      'Gemini kaliti sozlanmagan, shuning uchun reja faqat SchoolMind maʼlumotlari asosida tuziladi.',
+      'AI xizmati hozircha mavjud emas, shuning uchun reja faqat SchoolMind maʼlumotlari asosida tuziladi.',
     disclaimer:
       'Reja tavsiya xarakterida. Topshiriqlar, muddatlar va testlar SchoolMind maʼlumotlaridan olinadi.',
     fallbackTitle: 'Bugungi asosiy reja',
@@ -698,7 +698,7 @@ export const uz = {
     emptyBody: 'Fan va mavzuni tanlang — savollar shu yerda birma-bir koʻrinadi.',
     noKeyTitle: 'AI hozircha ulanmagan',
     noKeyBody:
-      'Gemini kaliti sozlanmagan. Quiz SchoolMind savollari bilan ishlaydi.',
+      'SchoolMind mahalliy savollar rejimida ishlamoqda.',
     disclaimer:
       'Quiz natijasi — shu mashqning hisobi, bilim darajangizning oʻlchovi emas.',
     errRateLimited: 'AI limiti tugadi yoki band.',
@@ -1000,6 +1000,14 @@ export const uz = {
     summaryExit: '{eligible} oʻquvchidan {responded} tasi yozma javob qoldirdi.',
     summaryCorrect: 'Toʻgʻri javob: {correct}/{responded} ({percent}%).',
     summaryUnanswered: 'Javob bermaganlar: {n}.',
+  },
+  topic: {
+    empty: 'Mavzuni yozing.',
+    tooShort: 'Mavzu juda qisqa — kamida ikki belgi yozing.',
+    tooLong: 'Mavzu juda uzun. Qisqaroq yozing.',
+    noLetters: 'Mavzuda soʻz boʻlishi kerak, faqat raqam emas.',
+    absurdPeriod:
+      'Bunday davr mavjud emas. Masalan: «XX asr islohotlari» yoki «2011-yil voqealari» deb yozing.',
   },
   error: {
     notFoundTitle: 'Sahifa topilmadi',

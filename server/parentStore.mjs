@@ -36,9 +36,9 @@ const STORE_VERSION = 1;
    `createdAt` is the real instant it was sent, and `dateISO` is the
    calendar day the app shows. Before the presentation those differ,
    so a message sent during a rehearsal reads as part of the demo day
-   instead of as a week-old note on a screen that says 10 October. On
+   instead of as a week-old note on a screen that says 8 October. On
    and after the day itself they are the same date. */
-const DEMO_REFERENCE_DATE = '2026-10-10';
+const DEMO_REFERENCE_DATE = '2026-10-08';
 
 function demoDateISO() {
   const now = new Date();

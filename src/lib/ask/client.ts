@@ -1,4 +1,4 @@
-import { postJson } from '@/lib/ai/request';
+import { postJson, SEARCH_TIMEOUT_MS } from '@/lib/ai/request';
 import type { AskCapabilities, AskErrorCode, AskRoute, WebSource } from './types';
 
 /* The only place the browser talks to the AskMySchool API. No key ever
@@ -50,10 +50,15 @@ function toErrorCode(value: unknown): AskErrorCode {
 }
 
 export async function postAsk(request: AskRequest, signal?: AbortSignal): Promise<AskResponse> {
+  /* A live question runs a real search on the provider's side, which
+     takes far longer than an ordinary answer — the normal deadline
+     would cut off searches that were about to return. */
+  const searching = request.route === 'WEB_SEARCH' || request.route === 'HYBRID';
+
   const result = await postJson<Partial<AskSuccess> & { error?: unknown }>(
     '/api/ask',
     request,
-    { signal },
+    { signal, ...(searching ? { timeoutMs: SEARCH_TIMEOUT_MS } : {}) },
   );
   if (!result.ok) return { ok: false, error: result.error };
 

@@ -1,5 +1,5 @@
 import { hasAnyAiKey, hasGeminiKey } from './env.mjs';
-import { generate, generateStructured, isGroundingAvailable } from './ai/index.mjs';
+import { generate, generateStructured, liveSearch } from './ai/index.mjs';
 import { sendAiError } from './ai/errors.mjs';
 import { logFailure, PayloadTooLarge, readBody, send } from './http.mjs';
 
@@ -273,20 +273,25 @@ async function handleFollowUp(req, res) {
   try {
     let result;
     let degraded = null;
-    if (wantsWeb && !isGroundingAvailable()) {
-      result = await generate({ system: buildFollowUpPrompt(locale), messages, web: false });
-      degraded = 'web_unavailable';
-    } else if (wantsWeb) {
-      try {
-        result = await generate({ system: buildFollowUpPrompt(locale), messages, web: true });
-        if (!result.usedWeb) degraded = 'no_results';
-      } catch (searchError) {
-        logFailure('snap grounded search', searchError);
-        result = await generate({ system: buildFollowUpPrompt(locale), messages, web: false });
-        degraded = 'web_unavailable';
+
+    if (wantsWeb) {
+      /* A follow-up that needs the live web takes the same route as
+         AskMySchool: a real search, or an honest refusal. */
+      const found = await liveSearch({ system: buildFollowUpPrompt(locale), messages });
+      if (!found) {
+        send(res, 200, {
+          ok: true,
+          text: '',
+          sources: [],
+          usedWeb: false,
+          degraded: 'web_unavailable',
+          withheld: true,
+        });
+        return;
       }
+      result = found;
     } else {
-      result = await generate({ system: buildFollowUpPrompt(locale), messages, web: false });
+      result = await generate({ system: buildFollowUpPrompt(locale), messages });
     }
 
     if (!result.text) {
