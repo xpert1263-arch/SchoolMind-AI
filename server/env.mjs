@@ -62,12 +62,18 @@ export const config = {
     : ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'],
 
   groqApiKey: envValue('GROQ_API_KEY'),
-  /* Groq's catalogue moves too. GPT-OSS 120B is the preferred free-tier
-     model for structured schoolwork; the Llama below is the fallback if
-     the account cannot serve it. GROQ_MODEL pins one. */
+  /* Groq's catalogue moves. GPT-OSS 120B is the preferred free-tier
+     model for structured schoolwork and 20B is the smaller sibling;
+     their daily token budgets are counted separately, so one can
+     carry the demo when the other is spent.
+
+     `llama-3.3-70b-versatile` used to sit between them and was
+     removed: this account gets 404 for it, so every failover spent a
+     hop discovering a model that does not exist. Only models this key
+     can actually serve belong here. GROQ_MODEL pins one. */
   groqModels: envValue('GROQ_MODEL')
     ? [envValue('GROQ_MODEL')]
-    : ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'openai/gpt-oss-20b'],
+    : ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
 
   telegramBotToken: envValue('TELEGRAM_BOT_TOKEN'),
 

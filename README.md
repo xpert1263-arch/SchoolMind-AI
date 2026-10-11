@@ -1,6 +1,6 @@
 # SchoolMind — AI School Assistant
 
-**v1.2 — SnapHomework AI Vision**
+**v1.8 — multi-provider AI, live web search, ClassPulse, Parent Connect**
 
 SchoolMind is one school operating system with **two workspaces** — Student and
 Teacher — built on **one shared school data model**. Switching mode changes the
@@ -23,10 +23,15 @@ Then open the printed URL (default <http://localhost:5180>).
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Vite dev server (also serves the AskMySchool API) |
-| `npm run build` | Typecheck (`tsc -b`) then production build |
-| `npm run preview` | Serve the production build |
+| `npm run dev` | Vite dev server (also serves the API) |
+| `npm run build` | Typecheck (`tsc -b`) then production build into `dist/` |
+| `npm start` | Production server: serves `dist/` **and** the API on one port |
+| `npm run preview` | Vite's own preview of the build |
 | `npm run typecheck` | Types only |
+
+In development the API is mounted inside Vite; in production
+`server/start.mjs` serves the same `askMiddleware` plus the built
+client, so there is one implementation of every endpoint either way.
 
 No accounts. The demo session lives in one versioned `localStorage` key
 (`schoolmind.v1`). AskMySchool adds a small server-side API for AI; see below.
@@ -34,13 +39,54 @@ No accounts. The demo session lives in one versioned `localStorage` key
 ### AI setup (optional)
 
 ```bash
-cp .env.example .env     # then paste a Gemini key into GEMINI_API_KEY
+cp .env.example .env     # then fill in the keys you have
 ```
 
-Without a key the app runs fine: every schedule, homework, test and
+| Variable | Used for | Without it |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | primary text provider, image reading, grounded search | Groq takes over text; image reading is disabled and says so |
+| `GROQ_API_KEY` | secondary text provider, `browser_search` live web | Gemini alone; no second chance when it is out of quota |
+| `TELEGRAM_BOT_TOKEN` | Parent Connect delivery | parent records still save; linking and sending are disabled and say so |
+
+All three are read **only** by `server/env.mjs`, inside the Node
+process. None is ever bundled into the client — never give them a
+`VITE_` prefix, which is exactly what would publish them.
+
+Without any key the app still runs: every schedule, homework, test and
 announcement question is answered from SchoolMind's own data with no
-network at all. Only AI explanations and live web search are disabled,
-and the UI says so instead of pretending.
+network at all, and each AI feature falls back to its own deterministic
+behaviour and says so instead of pretending.
+
+---
+
+## Deploying
+
+The build is one Node process: it serves the API and the built client
+on a single port, so it needs no separate frontend hosting.
+
+| Setting | Value |
+| --- | --- |
+| Install | `npm ci` |
+| Build | `npm run build` |
+| Start | `npm start` |
+| Port | `PORT` (defaults to 8080); the server binds `0.0.0.0` |
+| Health check | `GET /healthz` |
+| Node | 20 or newer |
+
+Set `GEMINI_API_KEY`, `GROQ_API_KEY` and `TELEGRAM_BOT_TOKEN` as
+secrets in the host's own environment settings — never in the
+repository.
+
+Two things worth knowing before scaling it:
+
+- **Run a single replica.** Parent Connect receives Telegram updates by
+  long polling, and Telegram allows one `getUpdates` consumer per bot.
+  A second replica would take the updates away from the first; the
+  bridge detects this (HTTP 409), waits, and says so in the log.
+- **Mount a volume for `SCHOOLMIND_DATA_DIR`** if parent records should
+  survive a redeploy. It defaults to `.schoolmind/` beside the repo,
+  which a container wipes on every restart — the names and Telegram
+  bindings would go with it.
 
 ---
 

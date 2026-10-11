@@ -43,3 +43,5 @@ Thumbs.db
 .temp/
 .tmp/
 *.tsbuildinfo
+
+.vercel

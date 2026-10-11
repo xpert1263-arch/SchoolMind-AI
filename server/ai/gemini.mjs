@@ -106,12 +106,26 @@ function noteGroundingRefused() {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /* A provider call that has not answered by now is not going to. The
-   vision budget is longer because an image takes longer to read. */
-const TEXT_TIMEOUT_MS = 35 * 1000;
+   vision budget is longer because an image takes longer to read.
+
+   The text budget is deliberately well under the browser's own
+   deadline. It used to be 35s, which was longer than it looks: a
+   stalled Gemini burned the whole 35s BEFORE Groq was even asked, so
+   a rescued request landed after the client had already given up and
+   told the teacher the AI was unavailable — for an answer the server
+   had successfully produced. The chain only helps if every hop fits
+   inside the wait. */
+const TEXT_TIMEOUT_MS = 20 * 1000;
 const VISION_TIMEOUT_MS = 60 * 1000;
 
 /** A 503 is momentary oversubscription; park the model only briefly. */
 const BUSY_COOLDOWN_MS = 60 * 1000;
+
+/* A model that answered nothing at all within its budget. Parked for
+   longer than a busy one — whatever is wrong with it is not a
+   momentary spike — but not for the full quota cooldown, because it
+   may simply have been a bad minute. */
+const STALL_COOLDOWN_MS = 10 * 60 * 1000;
 
 /**
  * Walks the candidate models until one answers.
@@ -147,9 +161,20 @@ async function withModelFailover(run, { onQuota = 'park', timeoutMs = TEXT_TIMEO
     } catch (error) {
       lastError = error;
 
-      /* A deadline is not a reason to try three more models and keep
-         the student waiting three times as long. */
-      if (error?.name === 'AiTimeoutError') throw error;
+      /* A model that stalls is a worse neighbour than one that
+         refuses. A refusal (429) is already parked, so it costs the
+         chain nothing after the first time; a stall used to be
+         retried on EVERY request, because nothing remembered it —
+         so every lesson plan, every study plan and every ClassPulse
+         analysis paid the same dead wait again, and the healthy
+         model further down the list was never reached.
+
+         Park it, then stop: one deadline per request is enough to
+         ask of anybody, and the next request skips straight past it. */
+      if (error?.name === 'AiTimeoutError') {
+        markModelExhausted(model, STALL_COOLDOWN_MS);
+        throw error;
+      }
 
       if (error?.status === 503) {
         await sleep(1500);

@@ -6,7 +6,6 @@ import {
   CircleSlash,
   ClipboardList,
   DoorClosed,
-  LineChart,
   PlusCircle,
   Users,
 } from 'lucide-react';
@@ -23,7 +22,7 @@ import {
   useTeacherAssignments,
   useTeacherToday,
 } from '@/state/selectors';
-import { EmptyState, FuturePanel } from '@/components/ui/Feedback';
+import { EmptyState } from '@/components/ui/Feedback';
 import { Metric, MetricStrip } from '@/components/ui/Metric';
 import { Panel, Rows, Section } from '@/components/ui/Surface';
 import { SubjectDot } from '@/components/ui/Status';
@@ -262,12 +261,6 @@ export function TeacherOverview() {
         </div>
       </div>
 
-      <FuturePanel
-        title={t('teacher.overview.pulseTitle')}
-        body={t('teacher.overview.pulseBody')}
-        version="v1.7"
-        icon={<LineChart size={16} aria-hidden />}
-      />
     </div>
   );
 }

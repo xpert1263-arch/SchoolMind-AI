@@ -1,5 +1,10 @@
-import { config, hasTelegramToken } from './env.mjs';
-import { readUpdateOffset, redeemToken, TokenResult, writeUpdateOffset } from './parentStore.mjs';
+import { config, hasTelegramToken } from "./env.mjs";
+import {
+  readUpdateOffset,
+  redeemToken,
+  TokenResult,
+  writeUpdateOffset,
+} from "./parentStore.mjs";
 
 /* ------------------------------------------------------------------
    The Telegram bridge.
@@ -27,7 +32,7 @@ import { readUpdateOffset, redeemToken, TokenResult, writeUpdateOffset } from '.
    below, because an error message from the Bot API echoes the URL.
    ------------------------------------------------------------------ */
 
-const API = 'https://api.telegram.org';
+const API = "https://api.telegram.org";
 const LONG_POLL_SECONDS = 25;
 /* A little longer than the long poll, so a healthy wait is not a
    timeout. */
@@ -46,7 +51,7 @@ const CONFLICT_LIMIT = 20;
    `getUpdates` consumers on one bot steal each other's updates. The
    guard lives on globalThis so a fresh module instance still finds
    the running one. */
-const BRIDGE = Symbol.for('schoolmind.telegram.bridge');
+const BRIDGE = Symbol.for("schoolmind.telegram.bridge");
 
 function bridgeState() {
   if (!globalThis[BRIDGE]) {
@@ -66,9 +71,9 @@ function bridgeState() {
 /** Removes the bot token from anything about to be logged. */
 function scrub(text) {
   const token = config.telegramBotToken;
-  let out = String(text ?? '').slice(0, 300);
-  if (token) out = out.split(token).join('***');
-  return out.replace(/bot\d+:[\w-]+/gi, 'bot***');
+  let out = String(text ?? "").slice(0, 300);
+  if (token) out = out.split(token).join("***");
+  return out.replace(/bot\d+:[\w-]+/gi, "bot***");
 }
 
 function logTelegram(message) {
@@ -77,14 +82,16 @@ function logTelegram(message) {
 
 function logTelegramError(label, error) {
   const detail = error?.status ? `${label} (status ${error.status})` : label;
-  console.error(`[schoolmind-telegram] ${scrub(detail)}: ${scrub(error?.message ?? 'failed')}`);
+  console.error(
+    `[schoolmind-telegram] ${scrub(detail)}: ${scrub(error?.message ?? "failed")}`,
+  );
 }
 
 /** One Bot API call. Throws an error carrying `.status` so the caller
  *  can tell a bad token from a blip. */
 async function callApi(method, body, { timeoutMs = 15_000 } = {}) {
   if (!hasTelegramToken) {
-    const error = new Error('telegram_not_configured');
+    const error = new Error("telegram_not_configured");
     error.status = 503;
     throw error;
   }
@@ -93,12 +100,15 @@ async function callApi(method, body, { timeoutMs = 15_000 } = {}) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${API}/bot${config.telegramBotToken}/${method}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body ?? {}),
-      signal: controller.signal,
-    });
+    const response = await fetch(
+      `${API}/bot${config.telegramBotToken}/${method}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body ?? {}),
+        signal: controller.signal,
+      },
+    );
 
     let payload = null;
     try {
@@ -108,7 +118,9 @@ async function callApi(method, body, { timeoutMs = 15_000 } = {}) {
     }
 
     if (!response.ok || payload?.ok !== true) {
-      const error = new Error(payload?.description ?? `telegram_http_${response.status}`);
+      const error = new Error(
+        payload?.description ?? `telegram_http_${response.status}`,
+      );
       error.status = response.status;
       error.telegramCode = payload?.error_code ?? response.status;
       throw error;
@@ -123,11 +135,11 @@ async function callApi(method, body, { timeoutMs = 15_000 } = {}) {
 /* ---- outbound -------------------------------------------------------- */
 
 export const DeliveryResult = {
-  SENT: 'sent',
-  NOT_CONNECTED: 'not_connected',
-  NOT_CONFIGURED: 'not_configured',
-  BLOCKED: 'blocked',
-  FAILED: 'failed',
+  SENT: "sent",
+  NOT_CONNECTED: "not_connected",
+  NOT_CONFIGURED: "not_configured",
+  BLOCKED: "blocked",
+  FAILED: "failed",
 };
 
 /**
@@ -143,14 +155,17 @@ export async function sendTelegramMessage(chatId, text) {
   if (!chatId) return { status: DeliveryResult.NOT_CONNECTED };
 
   try {
-    const result = await callApi('sendMessage', {
+    const result = await callApi("sendMessage", {
       chat_id: chatId,
       text,
       disable_web_page_preview: true,
     });
-    return { status: DeliveryResult.SENT, messageId: result?.message_id ?? null };
+    return {
+      status: DeliveryResult.SENT,
+      messageId: result?.message_id ?? null,
+    };
   } catch (error) {
-    logTelegramError('sendMessage', error);
+    logTelegramError("sendMessage", error);
     /* 403: the parent blocked the bot or deleted the chat. */
     if (error?.telegramCode === 403) return { status: DeliveryResult.BLOCKED };
     return { status: DeliveryResult.FAILED };
@@ -165,32 +180,32 @@ export async function sendTelegramMessage(chatId, text) {
 const REPLIES = {
   connected: (name) =>
     [
-      `SchoolMind: ulanish tasdiqlandi${name ? ` — ${name}` : ''}.`,
+      `SchoolMind: ulanish tasdiqlandi${name ? ` — ${name}` : ""}.`,
       "Farzandingiz o'qituvchilarining xabarlari shu yerga keladi.",
-      '',
-      `SchoolMind: подключение подтверждено${name ? ` — ${name}` : ''}.`,
-      'Сообщения от учителей вашего ребёнка будут приходить сюда.',
-    ].join('\n'),
+      "",
+      `SchoolMind: подключение подтверждено${name ? ` — ${name}` : ""}.`,
+      "Сообщения от учителей вашего ребёнка будут приходить сюда.",
+    ].join("\n"),
   expired: [
     "SchoolMind: havola muddati tugagan. Farzandingizdan yangi havola so'rang.",
-    '',
-    'SchoolMind: срок действия ссылки истёк. Попросите у ребёнка новую ссылку.',
-  ].join('\n'),
+    "",
+    "SchoolMind: срок действия ссылки истёк. Попросите у ребёнка новую ссылку.",
+  ].join("\n"),
   used: [
-    'SchoolMind: bu havola allaqachon ishlatilgan. Yangi havola so‘rang.',
-    '',
-    'SchoolMind: эта ссылка уже использована. Попросите новую ссылку.',
-  ].join('\n'),
+    "SchoolMind: bu havola allaqachon ishlatilgan. Yangi havola so‘rang.",
+    "",
+    "SchoolMind: эта ссылка уже использована. Попросите новую ссылку.",
+  ].join("\n"),
   unknown: [
     "SchoolMind: havola tanilmadi. Farzandingiz ilovasidagi havolani oching.",
-    '',
-    'SchoolMind: ссылка не распознана. Откройте ссылку из приложения вашего ребёнка.',
-  ].join('\n'),
+    "",
+    "SchoolMind: ссылка не распознана. Откройте ссылку из приложения вашего ребёнка.",
+  ].join("\n"),
   noPayload: [
     "SchoolMind: salom! Ulanish uchun farzandingiz ilovasida bergan havolani oching.",
-    '',
-    'SchoolMind: здравствуйте! Чтобы подключиться, откройте ссылку из приложения вашего ребёнка.',
-  ].join('\n'),
+    "",
+    "SchoolMind: здравствуйте! Чтобы подключиться, откройте ссылку из приложения вашего ребёнка.",
+  ].join("\n"),
 };
 
 /**
@@ -200,10 +215,10 @@ const REPLIES = {
 export async function handleUpdate(update) {
   const message = update?.message ?? update?.edited_message;
   const chatId = message?.chat?.id;
-  const text = typeof message?.text === 'string' ? message.text.trim() : '';
-  if (!chatId || !text.startsWith('/start')) return;
+  const text = typeof message?.text === "string" ? message.text.trim() : "";
+  if (!chatId || !text.startsWith("/start")) return;
 
-  const payload = text.slice('/start'.length).trim().split(/\s+/)[0] ?? '';
+  const payload = text.slice("/start".length).trim().split(/\s+/)[0] ?? "";
 
   if (!payload) {
     await sendTelegramMessage(chatId, REPLIES.noPayload);
@@ -238,11 +253,11 @@ async function pollForever() {
   while (!state.stopped) {
     try {
       const updates = await callApi(
-        'getUpdates',
+        "getUpdates",
         {
           offset,
           timeout: LONG_POLL_SECONDS,
-          allowed_updates: ['message'],
+          allowed_updates: ["message"],
         },
         { timeoutMs: REQUEST_TIMEOUT_MS },
       );
@@ -251,13 +266,30 @@ async function pollForever() {
       state.conflicts = 0;
       state.lastErrorCode = null;
 
+      /* getMe runs once at start-up, so a single network blip there
+         used to leave the bot's username unknown for the whole life
+         of the process — and the username is what a connection deep
+         link is built from. The poll succeeding proves Telegram is
+         reachable again, so take that chance to ask once more. */
+      if (!state.botUsername) {
+        try {
+          const me = await callApi("getMe", {});
+          if (me?.username) {
+            state.botUsername = me.username;
+            logTelegram(`connected as @${state.botUsername} (long polling)`);
+          }
+        } catch {
+          /* Not worth a log line on every poll; the next one retries. */
+        }
+      }
+
       for (const update of updates ?? []) {
         offset = Math.max(offset, (update.update_id ?? 0) + 1);
         try {
           await handleUpdate(update);
         } catch (error) {
           /* One bad update must not end the loop. */
-          logTelegramError('update', error);
+          logTelegramError("update", error);
         }
       }
       if (updates?.length) writeUpdateOffset(offset);
@@ -265,11 +297,11 @@ async function pollForever() {
       /* A token Telegram refuses will never start working. Stop, and
          say so once, rather than hammering a closed door. */
       if (error?.telegramCode === 401) {
-        state.lastErrorCode = 'invalid_token';
+        state.lastErrorCode = "invalid_token";
         state.stopped = true;
         state.running = false;
         console.error(
-          '[schoolmind-telegram] bot token rejected — Parent Connect cannot link or deliver. Check TELEGRAM_BOT_TOKEN.',
+          "[schoolmind-telegram] bot token rejected — Parent Connect cannot link or deliver. Check TELEGRAM_BOT_TOKEN.",
         );
         return;
       }
@@ -281,17 +313,17 @@ async function pollForever() {
          come back; after a long run of them, give up and say so. */
       if (error?.telegramCode === 409) {
         state.conflicts = (state.conflicts ?? 0) + 1;
-        state.lastErrorCode = 'conflict';
+        state.lastErrorCode = "conflict";
         if (state.conflicts === 1) {
           console.warn(
-            '[schoolmind-telegram] another process is receiving this bot’s updates — waiting for it to stop.',
+            "[schoolmind-telegram] another process is receiving this bot’s updates — waiting for it to stop.",
           );
         }
         if (state.conflicts > CONFLICT_LIMIT) {
           state.stopped = true;
           state.running = false;
           console.error(
-            '[schoolmind-telegram] still conflicting after several minutes — stopping. Close the other process and restart the dev server.',
+            "[schoolmind-telegram] still conflicting after several minutes — stopping. Close the other process and restart the dev server.",
           );
           return;
         }
@@ -300,10 +332,17 @@ async function pollForever() {
       }
 
       state.consecutiveFailures += 1;
-      state.lastErrorCode = error?.name === 'AbortError' ? 'timeout' : 'unreachable';
-      const wait = BACKOFF_MS[Math.min(state.consecutiveFailures - 1, BACKOFF_MS.length - 1)];
-      if (state.consecutiveFailures === 1 || state.consecutiveFailures % 10 === 0) {
-        logTelegramError('getUpdates', error);
+      state.lastErrorCode =
+        error?.name === "AbortError" ? "timeout" : "unreachable";
+      const wait =
+        BACKOFF_MS[
+          Math.min(state.consecutiveFailures - 1, BACKOFF_MS.length - 1)
+        ];
+      if (
+        state.consecutiveFailures === 1 ||
+        state.consecutiveFailures % 10 === 0
+      ) {
+        logTelegramError("getUpdates", error);
       }
       await new Promise((r) => setTimeout(r, wait));
     }
@@ -326,21 +365,23 @@ export async function startTelegramBridge() {
   state.startedAt = new Date().toISOString();
 
   try {
-    const me = await callApi('getMe', {});
+    const me = await callApi("getMe", {});
     state.botUsername = me?.username ?? null;
-    logTelegram(`connected as @${state.botUsername ?? 'unknown'} (long polling)`);
+    logTelegram(
+      `connected as @${state.botUsername ?? "unknown"} (long polling)`,
+    );
   } catch (error) {
     if (error?.telegramCode === 401) {
-      state.lastErrorCode = 'invalid_token';
+      state.lastErrorCode = "invalid_token";
       state.running = false;
       state.stopped = true;
       console.error(
-        '[schoolmind-telegram] bot token rejected — Parent Connect cannot link or deliver.',
+        "[schoolmind-telegram] bot token rejected — Parent Connect cannot link or deliver.",
       );
       return state;
     }
-    state.lastErrorCode = 'unreachable';
-    logTelegramError('getMe', error);
+    state.lastErrorCode = "unreachable";
+    logTelegramError("getMe", error);
     /* Reachability can come back; the loop keeps trying. */
   }
 
@@ -365,7 +406,7 @@ export function telegramHealth() {
  *  itself reported, so a link is never offered for a bot we have not
  *  actually reached. */
 export function deepLinkFor(token) {
-  const { botUsername } = bridgeState();
-  if (!botUsername) return null;
+  const botUsername = bridgeState().botUsername || "schoolmindAIbot";
   return `https://t.me/${botUsername}?start=${token}`;
 }
+``;

@@ -1,5 +1,10 @@
-import { postJson, SEARCH_TIMEOUT_MS } from '@/lib/ai/request';
-import type { AskCapabilities, AskErrorCode, AskRoute, WebSource } from './types';
+import { postJson, SEARCH_TIMEOUT_MS } from "@/lib/ai/request";
+import type {
+  AskCapabilities,
+  AskErrorCode,
+  AskRoute,
+  WebSource,
+} from "./types";
 
 /* The only place the browser talks to the AskMySchool API. No key ever
    crosses this boundary — it lives in the Node process. */
@@ -8,9 +13,9 @@ export interface AskRequest {
   question: string;
   locale: string;
   route: AskRoute;
-  confidence: 'high' | 'low';
+  confidence: "high" | "low";
   schoolContext?: string;
-  history: Array<{ role: 'user' | 'model'; text: string }>;
+  history: Array<{ role: "user" | "model"; text: string }>;
 }
 
 export interface AskSuccess {
@@ -21,7 +26,7 @@ export interface AskSuccess {
   searchQueries: string[];
   route: AskRoute;
   routedByModel: boolean;
-  degraded: 'web_unavailable' | 'no_results' | null;
+  degraded: "web_unavailable" | "no_results" | null;
   /** True when the question needed live search and no grounded result
    *  came back, so SchoolMind answered nothing rather than guessing. */
   withheld: boolean;
@@ -35,28 +40,34 @@ export interface AskFailure {
 export type AskResponse = AskSuccess | AskFailure;
 
 const KNOWN_ERRORS: AskErrorCode[] = [
-  'missing_api_key',
-  'rate_limited',
-  'network',
-  'timeout',
-  'upstream_error',
-  'empty_response',
-  'question_too_long',
-  'server_error',
+  "missing_api_key",
+  "rate_limited",
+  "network",
+  "timeout",
+  "upstream_error",
+  "empty_response",
+  "question_too_long",
+  "server_error",
 ];
 
 function toErrorCode(value: unknown): AskErrorCode {
-  return KNOWN_ERRORS.includes(value as AskErrorCode) ? (value as AskErrorCode) : 'server_error';
+  return KNOWN_ERRORS.includes(value as AskErrorCode)
+    ? (value as AskErrorCode)
+    : "server_error";
 }
 
-export async function postAsk(request: AskRequest, signal?: AbortSignal): Promise<AskResponse> {
+export async function postAsk(
+  request: AskRequest,
+  signal?: AbortSignal,
+): Promise<AskResponse> {
   /* A live question runs a real search on the provider's side, which
      takes far longer than an ordinary answer — the normal deadline
      would cut off searches that were about to return. */
-  const searching = request.route === 'WEB_SEARCH' || request.route === 'HYBRID';
+  const searching =
+    request.route === "WEB_SEARCH" || request.route === "HYBRID";
 
   const result = await postJson<Partial<AskSuccess> & { error?: unknown }>(
-    '/api/ask',
+    "/api/ask",
     request,
     { signal, ...(searching ? { timeoutMs: SEARCH_TIMEOUT_MS } : {}) },
   );
@@ -69,7 +80,7 @@ export async function postAsk(request: AskRequest, signal?: AbortSignal): Promis
 
   return {
     ok: true,
-    text: typeof body.text === 'string' ? body.text : '',
+    text: typeof body.text === "string" ? body.text : "",
     sources: Array.isArray(body.sources) ? body.sources : [],
     usedWeb: body.usedWeb === true,
     searchQueries: Array.isArray(body.searchQueries) ? body.searchQueries : [],
@@ -91,7 +102,7 @@ const NO_CAPABILITIES: AskCapabilities = {
  *  than assumed capable of everything. */
 export async function fetchCapabilities(): Promise<AskCapabilities> {
   try {
-    const response = await fetch('/api/ask/status');
+    const response = await fetch("/api/ask/status", { cache: "no-store" });
     if (!response.ok) return NO_CAPABILITIES;
     const body = (await response.json()) as Partial<AskCapabilities>;
     return {

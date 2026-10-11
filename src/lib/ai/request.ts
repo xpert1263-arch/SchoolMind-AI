@@ -11,8 +11,17 @@
    because a newer one was asked aborts this too.
    ------------------------------------------------------------------ */
 
-/** Plenty for a text turn; a stalled call is a failed call. */
-export const AI_TIMEOUT_MS = 40_000;
+/**
+ * Long enough for the WHOLE provider chain, not just one provider.
+ *
+ * The server may spend its Gemini budget on a stalled request and
+ * then hand the work to Groq. If this deadline were shorter than
+ * those two added together, a request Groq answered successfully
+ * would still be reported to the user as a failure — which is
+ * exactly what happened to the ClassPulse analysis. Keep this above
+ * the server's worst case (Gemini 20s + Groq 30s).
+ */
+export const AI_TIMEOUT_MS = 60_000;
 /** Reading an image legitimately takes longer. */
 export const VISION_TIMEOUT_MS = 70_000;
 /* A live search runs queries and opens pages on the provider's side,

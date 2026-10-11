@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarCheck2, Check, CircleSlash, Sparkles, Timer } from 'lucide-react';
+import { CalendarCheck2, Check, CircleSlash, Timer } from 'lucide-react';
 import type { HomeworkItem } from '@/data/types';
 import { useI18n } from '@/i18n/useI18n';
 import { formatLongDate, todayISO } from '@/lib/dates';
@@ -12,7 +12,7 @@ import {
   useStudentToday,
 } from '@/state/selectors';
 import { useApp } from '@/state/store';
-import { EmptyState, FuturePanel } from '@/components/ui/Feedback';
+import { EmptyState } from '@/components/ui/Feedback';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Panel, Rows, Section } from '@/components/ui/Surface';
 import { HomeworkDetail } from '@/components/school/HomeworkDetail';
@@ -156,13 +156,6 @@ export function MyDay() {
           </Section>
         </div>
       </div>
-
-      <FuturePanel
-        title={t('student.myDay.plannerTitle')}
-        body={t('student.myDay.plannerBody')}
-        version="v1.3"
-        icon={<Sparkles size={16} aria-hidden />}
-      />
 
       <HomeworkDetail item={detail} onClose={() => setDetail(null)} onToggle={toggleAssignmentDone} />
     </div>

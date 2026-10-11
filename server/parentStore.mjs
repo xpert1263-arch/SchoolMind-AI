@@ -28,7 +28,17 @@ import { classOfStudentId } from '../src/data/roster.mjs';
    which is personal data and the reason it is git-ignored.
    ------------------------------------------------------------------ */
 
-const STORE_PATH = resolve(process.cwd(), '.schoolmind', 'parents.json');
+/* Where the records live.
+
+   Configurable because a hosted container's filesystem is wiped on
+   every restart: pointing SCHOOLMIND_DATA_DIR at a mounted volume is
+   what keeps a parent's Telegram binding alive across a redeploy.
+   Left unset it behaves exactly as before, writing beside the repo. */
+const DATA_DIR = process.env.SCHOOLMIND_DATA_DIR
+  ? resolve(process.env.SCHOOLMIND_DATA_DIR)
+  : resolve(process.cwd(), '.schoolmind');
+
+const STORE_PATH = resolve(DATA_DIR, 'parents.json');
 const STORE_VERSION = 1;
 
 /* The same demo day the browser uses (src/lib/dates.ts). A message
